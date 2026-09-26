@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quico.srhelper.mapper.SrGachaItemMapper">
+    
+    <resultMap type="SrGachaItem" id="SrGachaItemResult">
+        <result property="id"    column="id"    />
+        <result property="keyword"    column="keyword"    />
+        <result property="itemName"    column="item_name"    />
+        <result property="itemType"    column="item_type"    />
+        <result property="rankType"    column="rank_type"    />
+        <result property="srId"    column="sr_id"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectSrGachaItemVo">
+        select id, keyword, item_name, item_type, rank_type, sr_id, create_by, create_time, update_by, update_time from sr_gacha_item
+    </sql>
+
+    <select id="selectSrGachaItemList" parameterType="SrGachaItem" resultMap="SrGachaItemResult">
+        <include refid="selectSrGachaItemVo"/>
+        <where>  
+            <if test="keyword != null  and keyword != ''"> and keyword = #{keyword}</if>
+            <if test="itemName != null  and itemName != ''"> and item_name like concat('%', #{itemName}, '%')</if>
+            <if test="itemType != null  and itemType != ''"> and item_type = #{itemType}</if>
+            <if test="rankType != null  and rankType != ''"> and rank_type = #{rankType}</if>
+        </where>
+    </select>
+    
+    <select id="selectSrGachaItemById" parameterType="Long" resultMap="SrGachaItemResult">
+        <include refid="selectSrGachaItemVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertSrGachaItem" parameterType="SrGachaItem" useGeneratedKeys="true" keyProperty="id">
+        insert into sr_gacha_item
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="keyword != null">keyword,</if>
+            <if test="itemName != null">item_name,</if>
+            <if test="itemType != null">item_type,</if>
+            <if test="rankType != null">rank_type,</if>
+            <if test="srId != null">sr_id,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="keyword != null">#{keyword},</if>
+            <if test="itemName != null">#{itemName},</if>
+            <if test="itemType != null">#{itemType},</if>
+            <if test="rankType != null">#{rankType},</if>
+            <if test="srId != null">#{srId},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+         </trim>
+    </insert>
+
+    <update id="updateSrGachaItem" parameterType="SrGachaItem">
+        update sr_gacha_item
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="keyword != null">keyword = #{keyword},</if>
+            <if test="itemName != null">item_name = #{itemName},</if>
+            <if test="itemType != null">item_type = #{itemType},</if>
+            <if test="rankType != null">rank_type = #{rankType},</if>
+            <if test="srId != null">sr_id = #{srId},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteSrGachaItemById" parameterType="Long">
+        delete from sr_gacha_item where id = #{id}
+    </delete>
+
+    <delete id="deleteSrGachaItemByIds" parameterType="String">
+        delete from sr_gacha_item where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quico.srhelper.mapper.SrLightConesMapper">
+    
+    <resultMap type="SrLightCones" id="SrLightConesResult">
+        <result property="id"    column="id"    />
+        <result property="lightConeName"    column="lightcone_name"    />
+        <result property="image"    column="image"    />
+        <result property="starLevel"    column="star_level"    />
+        <result property="path"    column="path"    />
+        <result property="releaseVersion"    column="release_version"    />
+        <result property="tag"    column="tag"    />
+        <result property="description"    column="description"    />
+        <result property="sortOrder"    column="sort_order"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectSrLightConesVo">
+        select id, lightcone_name, image, star_level, path, release_version, tag, description, sort_order, create_by, create_time, update_by, update_time from sr_lightcone
+    </sql>
+
+    <select id="selectSrLightConesList" parameterType="SrLightCones" resultMap="SrLightConesResult">
+        <include refid="selectSrLightConesVo"/>
+        <where>  
+            <if test="lightConeName != null  and lightConeName != ''"> and lightcone_name like concat('%', #{lightConeName}, '%')</if>
+            <if test="starLevel != null "> and star_level = #{starLevel}</if>
+            <if test="path != null  and path != ''"> and path = #{path}</if>
+            <if test="releaseVersion != null  and releaseVersion != ''"> and release_version = #{releaseVersion}</if>
+        </where>
+        ORDER BY sort_order DESC
+    </select>
+    
+    <select id="selectSrLightConesById" parameterType="Long" resultMap="SrLightConesResult">
+        <include refid="selectSrLightConesVo"/>
+        where id = #{id}
+    </select>
+
+    <select id="selectSrLightConesByNameAndVersion" resultMap="SrLightConesResult">
+        <include refid="selectSrLightConesVo"/>
+        where lightcone_name = #{lightConeName}
+        <choose>
+            <when test="releaseVersion != null and releaseVersion != ''"> and release_version = #{releaseVersion}</when>
+            <otherwise> and release_version IS NULL</otherwise>
+        </choose>
+        limit 1
+    </select>
+
+    <insert id="insertSrLightCones" parameterType="SrLightCones" useGeneratedKeys="true" keyProperty="id">
+        insert into sr_lightcone
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="lightConeName != null and lightConeName != ''">lightcone_name,</if>
+            <if test="image != null">image,</if>
+            <if test="starLevel != null">star_level,</if>
+            <if test="path != null">path,</if>
+            <if test="releaseVersion != null">release_version,</if>
+            <if test="tag != null">tag,</if>
+            <if test="description != null">description,</if>
+            <if test="sortOrder != null">sort_order,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="lightConeName != null and lightConeName != ''">#{lightConeName},</if>
+            <if test="image != null">#{image},</if>
+            <if test="starLevel != null">#{starLevel},</if>
+            <if test="path != null">#{path},</if>
+            <if test="releaseVersion != null">#{releaseVersion},</if>
+            <if test="tag != null">#{tag},</if>
+            <if test="description != null">#{description},</if>
+            <if test="sortOrder != null">#{sortOrder},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+         </trim>
+    </insert>
+
+    <update id="updateSrLightCones" parameterType="SrLightCones">
+        update sr_lightcone
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="lightConeName != null and lightConeName != ''">lightcone_name = #{lightConeName},</if>
+            <if test="image != null">image = #{image},</if>
+            <if test="starLevel != null">star_level = #{starLevel},</if>
+            <if test="path != null">path = #{path},</if>
+            <if test="releaseVersion != null">release_version = #{releaseVersion},</if>
+            <if test="tag != null">tag = #{tag},</if>
+            <if test="description != null">description = #{description},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteSrLightConesById" parameterType="Long">
+        delete from sr_lightcone where id = #{id}
+    </delete>
+
+    <delete id="deleteSrLightConesByIds" parameterType="String">
+        delete from sr_lightcone where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

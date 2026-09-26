@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quico.srhelper.mapper.SrCharacterAscensionTemplateMapper">
+    
+    <resultMap type="SrCharacterAscensionTemplate" id="SrCharacterAscensionTemplateResult">
+        <result property="id"    column="id"    />
+        <result property="templateType"    column="template_type"    />
+        <result property="ascensionType"    column="ascension_type"    />
+        <result property="breakLevel"    column="break_level"    />
+        <result property="materialSlot"    column="material_slot"    />
+        <result property="itemId"    column="item_id"    />
+        <result property="quantity"    column="quantity"    />
+        <result property="rarityLevel"    column="rarity_level"    />
+        <result property="sortOrder"    column="sort_order"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"    column="remark"    />
+    </resultMap>
+
+    <sql id="selectSrCharacterAscensionTemplateVo">
+        select id, template_type, ascension_type, break_level, material_slot, item_id, quantity, rarity_level, sort_order, create_by, create_time, update_by, update_time, remark from sr_character_ascension_template
+    </sql>
+
+    <select id="selectSrCharacterAscensionTemplateList" parameterType="SrCharacterAscensionTemplate" resultMap="SrCharacterAscensionTemplateResult">
+        <include refid="selectSrCharacterAscensionTemplateVo"/>
+        <where>  
+            <if test="templateType != null  and templateType != ''"> and template_type = #{templateType}</if>
+            <if test="ascensionType != null  and ascensionType != ''"> and ascension_type = #{ascensionType}</if>
+            <if test="itemId != null  and itemId != ''"> and item_id = #{itemId}</if>
+        </where>
+    </select>
+    
+    <select id="selectSrCharacterAscensionTemplateById" parameterType="Long" resultMap="SrCharacterAscensionTemplateResult">
+        <include refid="selectSrCharacterAscensionTemplateVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertSrCharacterAscensionTemplate" parameterType="SrCharacterAscensionTemplate" useGeneratedKeys="true" keyProperty="id">
+        insert into sr_character_ascension_template
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="templateType != null and templateType != ''">template_type,</if>
+            <if test="ascensionType != null and ascensionType != ''">ascension_type,</if>
+            <if test="breakLevel != null">break_level,</if>
+            <if test="materialSlot != null">material_slot,</if>
+            <if test="itemId != null and itemId != ''">item_id,</if>
+            <if test="quantity != null">quantity,</if>
+            <if test="rarityLevel != null">rarity_level,</if>
+            <if test="sortOrder != null">sort_order,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="remark != null">remark,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="templateType != null and templateType != ''">#{templateType},</if>
+            <if test="ascensionType != null and ascensionType != ''">#{ascensionType},</if>
+            <if test="breakLevel != null">#{breakLevel},</if>
+            <if test="materialSlot != null">#{materialSlot},</if>
+            <if test="itemId != null and itemId != ''">#{itemId},</if>
+            <if test="quantity != null">#{quantity},</if>
+            <if test="rarityLevel != null">#{rarityLevel},</if>
+            <if test="sortOrder != null">#{sortOrder},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="remark != null">#{remark},</if>
+         </trim>
+    </insert>
+
+    <update id="updateSrCharacterAscensionTemplate" parameterType="SrCharacterAscensionTemplate">
+        update sr_character_ascension_template
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="templateType != null and templateType != ''">template_type = #{templateType},</if>
+            <if test="ascensionType != null and ascensionType != ''">ascension_type = #{ascensionType},</if>
+            <if test="breakLevel != null">break_level = #{breakLevel},</if>
+            <if test="materialSlot != null">material_slot = #{materialSlot},</if>
+            <if test="itemId != null and itemId != ''">item_id = #{itemId},</if>
+            <if test="quantity != null">quantity = #{quantity},</if>
+            <if test="rarityLevel != null">rarity_level = #{rarityLevel},</if>
+            <if test="sortOrder != null">sort_order = #{sortOrder},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteSrCharacterAscensionTemplateById" parameterType="Long">
+        delete from sr_character_ascension_template where id = #{id}
+    </delete>
+
+    <delete id="deleteSrCharacterAscensionTemplateByIds" parameterType="String">
+        delete from sr_character_ascension_template where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <insert id="insertBatch" parameterType="java.util.List">
+        insert into sr_character_ascension_template (template_type, ascension_type, break_level, material_slot, item_id, quantity, rarity_level, sort_order, create_by, create_time)
+        values
+        <foreach collection="list" item="item" separator=",">
+            (#{item.templateType}, #{item.ascensionType}, #{item.breakLevel}, #{item.materialSlot}, #{item.itemId}, #{item.quantity}, #{item.rarityLevel}, #{item.sortOrder}, #{item.createBy}, #{item.createTime})
+        </foreach>
+    </insert>
+
+    <delete id="deleteByTemplateType" parameterType="String">
+        delete from sr_character_ascension_template where template_type = #{templateType}
+    </delete>
+
+    <select id="selectByTemplateType" parameterType="String" resultMap="SrCharacterAscensionTemplateResult">
+        <include refid="selectSrCharacterAscensionTemplateVo"/>
+        where template_type = #{templateType}
+        order by ascension_type, break_level, sort_order
+    </select>
+</mapper>

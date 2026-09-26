@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quico.srhelper.mapper.SrUserCharacterMapper">
+    
+    <resultMap type="SrUserCharacter" id="SrUserCharacterResult">
+        <result property="id"    column="id"    />
+        <result property="userId"    column="user_id"    />
+        <result property="characterId"    column="character_id"    />
+        <result property="level"    column="level"    />
+        <result property="eidolon"    column="eidolon"    />
+        <result property="basicAtkLevel"    column="basic_atk_level"    />
+        <result property="skillLevel"    column="skill_level"    />
+        <result property="ultimateLevel"    column="ultimate_level"    />
+        <result property="talentLevel"    column="talent_level"    />
+        <result property="bonusAbility1"    column="bonus_ability_1"    />
+        <result property="bonusAbility2"    column="bonus_ability_2"    />
+        <result property="bonusAbility3"    column="bonus_ability_3"    />
+        <result property="statBonus1"    column="stat_bonus_1"    />
+        <result property="statBonus2"    column="stat_bonus_2"    />
+        <result property="statBonus3"    column="stat_bonus_3"    />
+        <result property="statBonus4"    column="stat_bonus_4"    />
+        <result property="statBonus5"    column="stat_bonus_5"    />
+        <result property="statBonus6"    column="stat_bonus_6"    />
+        <result property="statBonus7"    column="stat_bonus_7"    />
+        <result property="statBonus8"    column="stat_bonus_8"    />
+        <result property="statBonus9"    column="stat_bonus_9"    />
+        <result property="statBonus10"    column="stat_bonus_10"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"    column="remark"    />
+    </resultMap>
+
+    <sql id="selectSrUserCharacterVo">
+        select id, user_id, character_id, level, eidolon, basic_atk_level, skill_level, ultimate_level, talent_level, bonus_ability_1, bonus_ability_2, bonus_ability_3, stat_bonus_1, stat_bonus_2, stat_bonus_3, stat_bonus_4, stat_bonus_5, stat_bonus_6, stat_bonus_7, stat_bonus_8, stat_bonus_9, stat_bonus_10, create_by, create_time, update_by, update_time, remark from sr_user_character
+    </sql>
+
+    <select id="selectSrUserCharacterList" parameterType="SrUserCharacter" resultMap="SrUserCharacterResult">
+        <include refid="selectSrUserCharacterVo"/>
+        <where>
+            <if test="userId != null "> and user_id = #{userId}</if>
+            <if test="characterId != null "> and character_id = #{characterId}</if>
+        </where>
+    </select>
+    
+    <select id="selectSrUserCharacterById" parameterType="Long" resultMap="SrUserCharacterResult">
+        <include refid="selectSrUserCharacterVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertSrUserCharacter" parameterType="SrUserCharacter" useGeneratedKeys="true" keyProperty="id">
+        insert into sr_user_character
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="userId != null">user_id,</if>
+            <if test="characterId != null">character_id,</if>
+            <if test="level != null">level,</if>
+            <if test="eidolon != null">eidolon,</if>
+            <if test="basicAtkLevel != null">basic_atk_level,</if>
+            <if test="skillLevel != null">skill_level,</if>
+            <if test="ultimateLevel != null">ultimate_level,</if>
+            <if test="talentLevel != null">talent_level,</if>
+            <if test="bonusAbility1 != null">bonus_ability_1,</if>
+            <if test="bonusAbility2 != null">bonus_ability_2,</if>
+            <if test="bonusAbility3 != null">bonus_ability_3,</if>
+            <if test="statBonus1 != null">stat_bonus_1,</if>
+            <if test="statBonus2 != null">stat_bonus_2,</if>
+            <if test="statBonus3 != null">stat_bonus_3,</if>
+            <if test="statBonus4 != null">stat_bonus_4,</if>
+            <if test="statBonus5 != null">stat_bonus_5,</if>
+            <if test="statBonus6 != null">stat_bonus_6,</if>
+            <if test="statBonus7 != null">stat_bonus_7,</if>
+            <if test="statBonus8 != null">stat_bonus_8,</if>
+            <if test="statBonus9 != null">stat_bonus_9,</if>
+            <if test="statBonus10 != null">stat_bonus_10,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="remark != null">remark,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="userId != null">#{userId},</if>
+            <if test="characterId != null">#{characterId},</if>
+            <if test="level != null">#{level},</if>
+            <if test="eidolon != null">#{eidolon},</if>
+            <if test="basicAtkLevel != null">#{basicAtkLevel},</if>
+            <if test="skillLevel != null">#{skillLevel},</if>
+            <if test="ultimateLevel != null">#{ultimateLevel},</if>
+            <if test="talentLevel != null">#{talentLevel},</if>
+            <if test="bonusAbility1 != null">#{bonusAbility1},</if>
+            <if test="bonusAbility2 != null">#{bonusAbility2},</if>
+            <if test="bonusAbility3 != null">#{bonusAbility3},</if>
+            <if test="statBonus1 != null">#{statBonus1},</if>
+            <if test="statBonus2 != null">#{statBonus2},</if>
+            <if test="statBonus3 != null">#{statBonus3},</if>
+            <if test="statBonus4 != null">#{statBonus4},</if>
+            <if test="statBonus5 != null">#{statBonus5},</if>
+            <if test="statBonus6 != null">#{statBonus6},</if>
+            <if test="statBonus7 != null">#{statBonus7},</if>
+            <if test="statBonus8 != null">#{statBonus8},</if>
+            <if test="statBonus9 != null">#{statBonus9},</if>
+            <if test="statBonus10 != null">#{statBonus10},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="remark != null">#{remark},</if>
+         </trim>
+    </insert>
+
+    <update id="updateSrUserCharacter" parameterType="SrUserCharacter">
+        update sr_user_character
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="userId != null">user_id = #{userId},</if>
+            <if test="characterId != null">character_id = #{characterId},</if>
+            <if test="level != null">level = #{level},</if>
+            <if test="eidolon != null">eidolon = #{eidolon},</if>
+            <if test="basicAtkLevel != null">basic_atk_level = #{basicAtkLevel},</if>
+            <if test="skillLevel != null">skill_level = #{skillLevel},</if>
+            <if test="ultimateLevel != null">ultimate_level = #{ultimateLevel},</if>
+            <if test="talentLevel != null">talent_level = #{talentLevel},</if>
+            <if test="bonusAbility1 != null">bonus_ability_1 = #{bonusAbility1},</if>
+            <if test="bonusAbility2 != null">bonus_ability_2 = #{bonusAbility2},</if>
+            <if test="bonusAbility3 != null">bonus_ability_3 = #{bonusAbility3},</if>
+            <if test="statBonus1 != null">stat_bonus_1 = #{statBonus1},</if>
+            <if test="statBonus2 != null">stat_bonus_2 = #{statBonus2},</if>
+            <if test="statBonus3 != null">stat_bonus_3 = #{statBonus3},</if>
+            <if test="statBonus4 != null">stat_bonus_4 = #{statBonus4},</if>
+            <if test="statBonus5 != null">stat_bonus_5 = #{statBonus5},</if>
+            <if test="statBonus6 != null">stat_bonus_6 = #{statBonus6},</if>
+            <if test="statBonus7 != null">stat_bonus_7 = #{statBonus7},</if>
+            <if test="statBonus8 != null">stat_bonus_8 = #{statBonus8},</if>
+            <if test="statBonus9 != null">stat_bonus_9 = #{statBonus9},</if>
+            <if test="statBonus10 != null">stat_bonus_10 = #{statBonus10},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteSrUserCharacterById" parameterType="Long">
+        delete from sr_user_character where id = #{id}
+    </delete>
+
+    <delete id="deleteSrUserCharacterByIds" parameterType="String">
+        delete from sr_user_character where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

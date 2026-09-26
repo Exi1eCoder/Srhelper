@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quico.infra.mapper.SrMaterialMapper">
+    
+    <resultMap type="SrMaterial" id="SrMaterialResult">
+        <result property="id"    column="id"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="creator"    column="create_by"    />
+        <result property="type"    column="type"    />
+        <result property="groupId"    column="group_id"    />
+        <result property="name"    column="name"    />
+        <result property="url"    column="url"    />
+        <result property="updater"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="deleted"    column="deleted"    />
+        <result property="tenantId"    column="tenant_id"    />
+    </resultMap>
+
+    <resultMap id="SrMaterialSrMaterialGroupResult" type="SrMaterial" extends="SrMaterialResult">
+        <collection property="srMaterialGroupList" ofType="SrMaterialGroup" column="id" select="selectSrMaterialGroupList" />
+    </resultMap>
+
+    <resultMap type="SrMaterialGroup" id="SrMaterialGroupResult">
+        <result property="id"    column="id"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="creator"    column="create_by"    />
+        <result property="name"    column="name"    />
+        <result property="updater"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="deleted"    column="deleted"    />
+    </resultMap>
+
+    <sql id="selectSrMaterialVo">
+        select id, create_time, create_by, type, group_id, name, url, update_by, update_time, deleted, tenant_id from sr_material
+    </sql>
+
+    <select id="selectSrMaterialList" parameterType="SrMaterial" resultMap="SrMaterialResult">
+        <include refid="selectSrMaterialVo"/>
+        <where>  
+            <if test="creator != null  and creator != ''"> and create_by = #{creator}</if>
+            <if test="type != null  and type != ''"> and type = #{type}</if>
+            <if test="groupId != null  and groupId != ''"> and group_id = #{groupId}</if>
+            and deleted = 0 order by id desc
+        </where>
+    </select>
+    
+    <select id="selectSrMaterialById" parameterType="Long" resultMap="SrMaterialSrMaterialGroupResult">
+        select id, create_time, create_by, type, group_id, name, url, update_by, update_time, deleted, tenant_id
+        from sr_material
+        where id = #{id}
+    </select>
+
+    <select id="selectSrMaterialGroupList" resultMap="SrMaterialGroupResult">
+        select id, create_time, create_by, name, update_by, update_time, deleted
+        from sr_material_group
+        where id = #{id}
+    </select>
+
+    <insert id="insertSrMaterial" parameterType="SrMaterial" useGeneratedKeys="true" keyProperty="id">
+        insert into sr_material
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="createTime != null">create_time,</if>
+            <if test="creator != null">create_by,</if>
+            <if test="type != null">type,</if>
+            <if test="groupId != null">group_id,</if>
+            <if test="name != null">name,</if>
+            <if test="url != null">url,</if>
+            <if test="updater != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="deleted != null">deleted,</if>
+            <if test="tenantId != null">tenant_id,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="createTime != null">#{createTime},</if>
+            <if test="creator != null">#{creator},</if>
+            <if test="type != null">#{type},</if>
+            <if test="groupId != null">#{groupId},</if>
+            <if test="name != null">#{name},</if>
+            <if test="url != null">#{url},</if>
+            <if test="updater != null">#{updater},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="deleted != null">#{deleted},</if>
+            <if test="tenantId != null">#{tenantId},</if>
+         </trim>
+    </insert>
+
+    <update id="updateSrMaterial" parameterType="SrMaterial">
+        update sr_material
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="creator != null">creator = #{creator},</if>
+            <if test="type != null">type = #{type},</if>
+            <if test="groupId != null">group_id = #{groupId},</if>
+            <if test="name != null">name = #{name},</if>
+            <if test="url != null">url = #{url},</if>
+            <if test="updater != null">updater = #{updater},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="deleted != null">deleted = #{deleted},</if>
+            <if test="tenantId != null">tenant_id = #{tenantId},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteSrMaterialById" parameterType="Long">
+        delete from sr_material where id = #{id}
+    </delete>
+
+    <delete id="deleteSrMaterialByIds" parameterType="String">
+        delete from sr_material where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+    
+    <delete id="deleteSrMaterialGroupByIds" parameterType="String">
+        delete from sr_material_group where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <delete id="deleteSrMaterialGroupById" parameterType="Long">
+        delete from sr_material_group where id = #{id}
+    </delete>
+
+    <insert id="batchSrMaterialGroup">
+        insert into sr_material_group( id, create_time, create_by, name, update_by, update_time, deleted) values
+        <foreach item="item" index="index" collection="list" separator=",">
+            ( #{item.id}, #{item.createTime}, #{item.creator}, #{item.name}, #{item.updater}, #{item.updateTime}, #{item.deleted})
+        </foreach>
+    </insert>
+
+    <select id="selectSrMaterialGroupByIds" resultMap="SrMaterialGroupResult">
+        select id, create_time, create_by, name, update_by, update_time, deleted
+        from sr_material_group
+        where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+</mapper>

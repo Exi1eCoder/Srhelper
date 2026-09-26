@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quico.srhelper.mapper.SrLightconeExpUpgradeMapper">
+
+    <select id="selectAllOrderByStarAndLevel" resultType="SrLightconeExpUpgrade">
+        select * from sr_lightcone_exp_upgrade order by star_level asc, min_level asc
+    </select>
+
+    <select id="selectByStarAndLevel" resultType="SrLightconeExpUpgrade">
+        select * from sr_lightcone_exp_upgrade
+        where star_level = #{starLevel}
+          and min_level &lt;= #{level}
+          and max_level &gt; #{level}
+    </select>
+
+    <select id="selectByStarLevel" parameterType="Integer" resultType="SrLightconeExpUpgrade">
+        select * from sr_lightcone_exp_upgrade
+        where star_level = #{starLevel}
+        order by min_level asc
+    </select>
+
+</mapper>

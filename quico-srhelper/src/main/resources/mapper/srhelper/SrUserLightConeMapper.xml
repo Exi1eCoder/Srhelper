@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quico.srhelper.mapper.SrUserLightConeMapper">
+    
+    <resultMap type="SrUserLightCone" id="SrUserLightConeResult">
+        <result property="id"    column="id"    />
+        <result property="userId"    column="user_id"    />
+        <result property="lightConeId"    column="lightcone_id"    />
+        <result property="level"    column="level"    />
+        <result property="superimposition"    column="superimposition"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"    column="remark"    />
+    </resultMap>
+    
+    <resultMap type="SrUserLightCone" id="SrUserLightConeWithDetailsResult" extends="SrUserLightConeResult">
+        <result property="lightConeName"    column="lightcone_name"    />
+        <result property="lightConeImage"    column="image"    />
+        <result property="starLevel"    column="star_level"    />
+        <result property="path"    column="path"    />
+    </resultMap>
+
+    <sql id="selectSrUserLightConeVo">
+        select id, user_id, lightcone_id, level, superimposition, create_by, create_time, update_by, update_time, remark from sr_user_lightcone
+    </sql>
+
+    <select id="selectSrUserLightConeList" parameterType="SrUserLightCone" resultMap="SrUserLightConeResult">
+        SELECT ul.*
+        FROM sr_user_lightcone ul
+        INNER JOIN sr_lightcone lc ON ul.lightcone_id = lc.id
+        <where>
+            <if test="userId != null "> AND ul.user_id = #{userId}</if>
+            <if test="lightConeId != null "> AND ul.lightcone_id = #{lightConeId}</if>
+            <if test="level != null "> AND ul.level = #{level}</if>
+            <if test="superimposition != null "> AND ul.superimposition = #{superimposition}</if>
+        </where>
+        ORDER BY lc.sort_order desc<!--, lc.id ASC-->
+    </select>
+    
+    <select id="selectSrUserLightConeById" parameterType="Long" resultMap="SrUserLightConeResult">
+        <include refid="selectSrUserLightConeVo"/>
+        where id = #{id}
+    </select>
+
+    <select id="selectByUserIdWithDetails" parameterType="Long" resultMap="SrUserLightConeWithDetailsResult">
+        select ulc.id, ulc.user_id, ulc.lightcone_id, ulc.level, ulc.superimposition,
+               ulc.create_by, ulc.create_time, ulc.update_by, ulc.update_time, ulc.remark,
+               lc.lightcone_name, lc.image, lc.star_level, lc.path
+        from sr_user_lightcone ulc
+        left join sr_lightcone lc on ulc.lightcone_id = lc.id
+        where ulc.user_id = #{userId}
+        order by lc.sort_order desc, ulc.level desc, ulc.superimposition desc
+    </select>
+
+    <select id="selectByIdWithDetails" parameterType="Long" resultMap="SrUserLightConeWithDetailsResult">
+        select ulc.id, ulc.user_id, ulc.lightcone_id, ulc.level, ulc.superimposition,
+               ulc.create_by, ulc.create_time, ulc.update_by, ulc.update_time, ulc.remark,
+               lc.lightcone_name, lc.image, lc.star_level, lc.path
+        from sr_user_lightcone ulc
+        left join sr_lightcone lc on ulc.lightcone_id = lc.id
+        where ulc.id = #{id}
+    </select>
+
+    <insert id="insertSrUserLightCone" parameterType="SrUserLightCone" useGeneratedKeys="true" keyProperty="id">
+        insert into sr_user_lightcone
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="userId != null">user_id,</if>
+            <if test="lightConeId != null">lightcone_id,</if>
+            <if test="level != null">level,</if>
+            <if test="superimposition != null">superimposition,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="remark != null">remark,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="userId != null">#{userId},</if>
+            <if test="lightConeId != null">#{lightConeId},</if>
+            <if test="level != null">#{level},</if>
+            <if test="superimposition != null">#{superimposition},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="remark != null">#{remark},</if>
+        </trim>
+    </insert>
+
+    <update id="updateSrUserLightCone" parameterType="SrUserLightCone">
+        update sr_user_lightcone
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="userId != null">user_id = #{userId},</if>
+            <if test="lightConeId != null">lightcone_id = #{lightConeId},</if>
+            <if test="level != null">level = #{level},</if>
+            <if test="superimposition != null">superimposition = #{superimposition},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteSrUserLightConeById" parameterType="Long">
+        delete from sr_user_lightcone where id = #{id}
+    </delete>
+
+    <delete id="deleteSrUserLightConeByIds" parameterType="String">
+        delete from sr_user_lightcone where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

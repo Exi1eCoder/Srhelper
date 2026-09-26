@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quico.srhelper.mapper.SrItemMapper">
+    
+    <resultMap type="SrItem" id="SrItemResult">
+        <result property="id"    column="id"    />
+        <result property="itemName"    column="item_name"    />
+        <result property="image"    column="image"    />
+        <result property="starLevel"    column="star_level"    />
+        <result property="itemType"    column="item_type"    />
+        <result property="ascensionType"    column="ascension_type"    />
+        <result property="seriesId"    column="series_id"    />
+        <result property="combatType"    column="combat_type"    />
+        <result property="path"    column="path"    />
+        <result property="tag"    column="tag"    />
+        <result property="releaseVersion"    column="release_version"    />
+        <result property="description"    column="description"    />
+        <result property="sortOrder"    column="sort_order"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"    column="remark"    />
+    </resultMap>
+
+    <sql id="selectSrItemVo">
+        select id, item_name, image, star_level, item_type, ascension_type, series_id, combat_type, path, tag,  release_version, description, sort_order, create_by, create_time, update_by, update_time, remark from sr_item
+    </sql>
+
+    <select id="selectSrItemList" parameterType="SrItem" resultMap="SrItemResult">
+        <include refid="selectSrItemVo"/>
+        <where>  
+            <if test="itemName != null  and itemName != ''"> and item_name like concat('%', #{itemName}, '%')</if>
+            <if test="starLevel != null "> and star_level = #{starLevel}</if>
+            <if test="itemType != null  and itemType != ''"> and item_type = #{itemType}</if>
+            <if test="ascensionType != null  and ascensionType != ''"> and ascension_type = #{ascensionType}</if>
+            <if test="combatType != null  and combatType != ''"> and combat_type = #{combatType}</if>
+            <if test="path != null  and path != ''"> and path = #{path}</if>
+            <if test="releaseVersion != null  and releaseVersion != ''"> and release_version = #{releaseVersion}</if>
+        </where>
+        ORDER BY sort_order DESC
+    </select>
+    
+    <select id="selectSrItemById" parameterType="Long" resultMap="SrItemResult">
+        <include refid="selectSrItemVo"/>
+        where id = #{id}
+    </select>
+
+    <select id="selectSrItemByName" resultMap="SrItemResult">
+        <include refid="selectSrItemVo"/>
+        where item_name = #{itemName}
+        limit 1
+    </select>
+
+    <insert id="insertSrItem" parameterType="SrItem" useGeneratedKeys="true" keyProperty="id">
+        insert into sr_item
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="itemName != null and itemName != ''">item_name,</if>
+            <if test="image != null">image,</if>
+            <if test="starLevel != null">star_level,</if>
+            <if test="itemType != null">item_type,</if>
+            <if test="ascensionType != null">ascension_type,</if>
+            <if test="seriesId != null">series_id,</if>
+            <if test="combatType != null">combat_type,</if>
+            <if test="path != null">path,</if>
+            <if test="tag != null">tag,</if>
+            <if test="releaseVersion != null">release_version,</if>
+            <if test="description != null">description,</if>
+            <if test="sortOrder != null">sort_order,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="remark != null">remark,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="itemName != null and itemName != ''">#{itemName},</if>
+            <if test="image != null">#{image},</if>
+            <if test="starLevel != null">#{starLevel},</if>
+            <if test="itemType != null">#{itemType},</if>
+            <if test="ascensionType != null">#{ascensionType},</if>
+            <if test="seriesId != null">#{seriesId},</if>
+            <if test="combatType != null">#{combatType},</if>
+            <if test="path != null">#{path},</if>
+            <if test="tag != null">#{tag},</if>
+            <if test="releaseVersion != null">#{releaseVersion},</if>
+            <if test="description != null">#{description},</if>
+            <if test="sortOrder != null">#{sortOrder},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="remark != null">#{remark},</if>
+         </trim>
+    </insert>
+
+    <update id="updateSrItem" parameterType="SrItem">
+        update sr_item
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="itemName != null and itemName != ''">item_name = #{itemName},</if>
+            <if test="image != null">image = #{image},</if>
+            <if test="starLevel != null">star_level = #{starLevel},</if>
+            <if test="itemType != null">item_type = #{itemType},</if>
+            <if test="ascensionType != null">ascension_type = #{ascensionType},</if>
+            <if test="seriesId != null">series_id = #{seriesId},</if>
+            <if test="combatType != null">combat_type = #{combatType},</if>
+            <if test="path != null">path = #{path},</if>
+            <if test="tag != null">tag = #{tag},</if>
+            <if test="releaseVersion != null">release_version = #{releaseVersion},</if>
+            <if test="description != null">description = #{description},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteSrItemById" parameterType="Long">
+        delete from sr_item where id = #{id}
+    </delete>
+
+    <delete id="deleteSrItemByIds" parameterType="String">
+        delete from sr_item where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="selectBySeriesId" parameterType="Long" resultMap="SrItemResult">
+        <include refid="selectSrItemVo"/>
+        where series_id = #{seriesId}
+        order by star_level
+    </select>
+</mapper>

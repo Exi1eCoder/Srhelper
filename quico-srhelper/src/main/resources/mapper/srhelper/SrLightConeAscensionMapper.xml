@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quico.srhelper.mapper.SrLightConeAscensionMapper">
+
+    <resultMap type="SrLightConeAscension" id="SrLightConeAscensionResult">
+        <result property="id"             column="id"              />
+        <result property="lightConeId"    column="lightcone_id"   />
+        <result property="ascensionPhase" column="ascension_phase" />
+        <result property="breakLevel"     column="break_level"     />
+        <result property="materialSlot"   column="material_slot"   />
+        <result property="itemId"         column="item_id"         />
+        <result property="rarityLevel"    column="rarity_level"    />
+        <result property="quantity"       column="quantity"        />
+        <result property="sortOrder"      column="sort_order"      />
+        <result property="createBy"       column="create_by"       />
+        <result property="createTime"     column="create_time"     />
+        <result property="updateBy"       column="update_by"       />
+        <result property="updateTime"     column="update_time"     />
+        <result property="remark"         column="remark"          />
+        <result property="itemName"       column="item_name"       />
+        <result property="itemImage"      column="item_image"      />
+    </resultMap>
+
+    <sql id="selectSrLightConeAscensionVo">
+        select a.id, a.lightcone_id, a.ascension_phase, a.break_level, a.material_slot,
+        a.item_id, a.rarity_level, a.quantity, a.sort_order,
+        a.create_by, a.create_time, a.update_by, a.update_time, a.remark,
+        i.item_name, i.image as item_image
+        from sr_lightcone_ascension_material a
+        left join sr_item i on a.item_id = i.id
+    </sql>
+
+    <select id="selectSrLightConeAscensionList" parameterType="SrLightConeAscension" resultMap="SrLightConeAscensionResult">
+        <include refid="selectSrLightConeAscensionVo"/>
+        <where>
+            <if test="lightConeId != null "> and a.lightcone_id = #{lightConeId}</if>
+            <if test="ascensionPhase != null "> and a.ascension_phase = #{ascensionPhase}</if>
+            <if test="itemId != null "> and a.item_id = #{itemId}</if>
+        </where>
+        order by a.lightcone_id, a.ascension_phase, a.material_slot
+    </select>
+
+    <select id="selectSrLightConeAscensionById" parameterType="Long" resultMap="SrLightConeAscensionResult">
+        <include refid="selectSrLightConeAscensionVo"/>
+        where a.id = #{id}
+    </select>
+
+    <select id="selectSrLightConeAscensionByConeId" parameterType="Long" resultMap="SrLightConeAscensionResult">
+        <include refid="selectSrLightConeAscensionVo"/>
+        where a.lightcone_id = #{lightConeId}
+        order by a.ascension_phase, a.material_slot
+    </select>
+
+    <insert id="insertSrLightConeAscension" parameterType="SrLightConeAscension" useGeneratedKeys="true" keyProperty="id">
+        insert into sr_lightcone_ascension_material
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="lightConeId != null">lightcone_id,</if>
+            <if test="ascensionPhase != null">ascension_phase,</if>
+            <if test="breakLevel != null">break_level,</if>
+            <if test="materialSlot != null">material_slot,</if>
+            <if test="itemId != null">item_id,</if>
+            <if test="rarityLevel != null">rarity_level,</if>
+            <if test="quantity != null">quantity,</if>
+            <if test="sortOrder != null">sort_order,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="remark != null">remark,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="lightConeId != null">#{lightConeId},</if>
+            <if test="ascensionPhase != null">#{ascensionPhase},</if>
+            <if test="breakLevel != null">#{breakLevel},</if>
+            <if test="materialSlot != null">#{materialSlot},</if>
+            <if test="itemId != null">#{itemId},</if>
+            <if test="rarityLevel != null">#{rarityLevel},</if>
+            <if test="quantity != null">#{quantity},</if>
+            <if test="sortOrder != null">#{sortOrder},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="remark != null">#{remark},</if>
+        </trim>
+    </insert>
+
+    <update id="updateSrLightConeAscension" parameterType="SrLightConeAscension">
+        update sr_lightcone_ascension_material
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="lightConeId != null">lightcone_id = #{lightConeId},</if>
+            <if test="ascensionPhase != null">ascension_phase = #{ascensionPhase},</if>
+            <if test="breakLevel != null">break_level = #{breakLevel},</if>
+            <if test="materialSlot != null">material_slot = #{materialSlot},</if>
+            <if test="itemId != null">item_id = #{itemId},</if>
+            <if test="rarityLevel != null">rarity_level = #{rarityLevel},</if>
+            <if test="quantity != null">quantity = #{quantity},</if>
+            <if test="sortOrder != null">sort_order = #{sortOrder},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteSrLightConeAscensionById" parameterType="Long">
+        delete from sr_lightcone_ascension_material where id = #{id}
+    </delete>
+
+    <delete id="deleteSrLightConeAscensionByIds" parameterType="String">
+        delete from sr_lightcone_ascension_material where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <delete id="deleteSrLightConeAscensionByConeId" parameterType="Long">
+        delete from sr_lightcone_ascension_material where lightcone_id = #{lightConeId}
+    </delete>
+
+    <insert id="insertBatch">
+        INSERT INTO sr_lightcone_ascension_material
+        (lightcone_id, ascension_phase, break_level, material_slot,
+         item_id, rarity_level, quantity, sort_order,
+         create_by, create_time, update_by, update_time)
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.lightConeId}, #{item.ascensionPhase}, #{item.breakLevel},
+             #{item.materialSlot}, #{item.itemId}, #{item.rarityLevel},
+             #{item.quantity}, #{item.sortOrder},
+             #{item.createBy}, #{item.createTime}, #{item.updateBy}, #{item.updateTime})
+        </foreach>
+    </insert>
+
+</mapper>

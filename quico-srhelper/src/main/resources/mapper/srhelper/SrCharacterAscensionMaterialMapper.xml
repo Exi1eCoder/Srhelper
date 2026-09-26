@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quico.srhelper.mapper.SrCharacterAscensionMaterialMapper">
+
+    <resultMap type="SrCharacterAscensionMaterial" id="Result">
+        <result property="id"             column="id"              />
+        <result property="characterId"    column="character_id"    />
+        <result property="ascensionType" column="ascension_type" />
+        <result property="breakLevel"     column="break_level"     />
+        <result property="materialSlot"   column="material_slot"   />
+        <result property="itemId"         column="item_id"         />
+        <result property="rarityLevel"    column="rarity_level"    />
+        <result property="quantity"       column="quantity"        />
+        <result property="expRequired"    column="exp_required"    />
+        <result property="sortOrder"      column="sort_order"      />
+        <result property="createBy"       column="create_by"       />
+        <result property="createTime"     column="create_time"     />
+        <result property="updateBy"       column="update_by"       />
+        <result property="updateTime"     column="update_time"     />
+        <result property="remark"         column="remark"          />
+        <result property="itemName"       column="item_name"       />
+        <result property="itemImage"      column="item_image"      />
+    </resultMap>
+
+    <sql id="selectVo">
+        select m.id, m.character_id, m.ascension_type, m.break_level,
+        m.material_slot, m.item_id, m.rarity_level, m.quantity,
+        m.exp_required, m.sort_order,
+        m.create_by, m.create_time, m.update_by, m.update_time, m.remark,
+        i.item_name, i.image as item_image
+        from sr_character_ascension_material m
+        left join sr_item i on m.item_id = i.id
+    </sql>
+
+    <select id="selectList" parameterType="SrCharacterAscensionMaterial" resultMap="Result">
+        <include refid="selectVo"/>
+        <where>
+            <if test="characterId != null"> and m.character_id = #{characterId}</if>
+            <if test="ascensionType != null"> and m.ascension_type = #{ascensionType}</if>
+        </where>
+        order by m.character_id, m.ascension_type, m.material_slot
+    </select>
+
+    <select id="selectById" parameterType="Long" resultMap="Result">
+        <include refid="selectVo"/> where m.id = #{id}
+    </select>
+
+    <select id="selectByCharacterId" parameterType="Long" resultMap="Result">
+        <include refid="selectVo"/> where m.character_id = #{characterId}
+        order by m.ascension_type, m.material_slot
+    </select>
+
+    <insert id="insert" parameterType="SrCharacterAscensionMaterial" useGeneratedKeys="true" keyProperty="id">
+        insert into sr_character_ascension_material
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="characterId != null">character_id,</if>
+            <if test="ascensionType != null">ascension_type,</if>
+            <if test="breakLevel != null">break_level,</if>
+            <if test="materialSlot != null">material_slot,</if>
+            <if test="itemId != null">item_id,</if>
+            <if test="rarityLevel != null">rarity_level,</if>
+            <if test="quantity != null">quantity,</if>
+            <if test="expRequired != null">exp_required,</if>
+            <if test="sortOrder != null">sort_order,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="characterId != null">#{characterId},</if>
+            <if test="ascensionType != null">#{ascensionType},</if>
+            <if test="breakLevel != null">#{breakLevel},</if>
+            <if test="materialSlot != null">#{materialSlot},</if>
+            <if test="itemId != null">#{itemId},</if>
+            <if test="rarityLevel != null">#{rarityLevel},</if>
+            <if test="quantity != null">#{quantity},</if>
+            <if test="expRequired != null">#{expRequired},</if>
+            <if test="sortOrder != null">#{sortOrder},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+        </trim>
+    </insert>
+
+    <update id="update" parameterType="SrCharacterAscensionMaterial">
+        update sr_character_ascension_material
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="characterId != null">character_id = #{characterId},</if>
+            <if test="ascensionType != null">ascension_type = #{ascensionType},</if>
+            <if test="breakLevel != null">break_level = #{breakLevel},</if>
+            <if test="materialSlot != null">material_slot = #{materialSlot},</if>
+            <if test="itemId != null">item_id = #{itemId},</if>
+            <if test="rarityLevel != null">rarity_level = #{rarityLevel},</if>
+            <if test="quantity != null">quantity = #{quantity},</if>
+            <if test="expRequired != null">exp_required = #{expRequired},</if>
+            <if test="sortOrder != null">sort_order = #{sortOrder},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteById" parameterType="Long">
+        delete from sr_character_ascension_material where id = #{id}
+    </delete>
+
+    <delete id="deleteByIds" parameterType="String">
+        delete from sr_character_ascension_material where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">#{id}</foreach>
+    </delete>
+
+    <delete id="deleteByCharacterId" parameterType="Long">
+        delete from sr_character_ascension_material where character_id = #{characterId}
+    </delete>
+
+    <!-- 批量插入晋升材料 -->
+    <insert id="insertBatch" parameterType="java.util.List">
+        INSERT INTO sr_character_ascension_material 
+        (character_id, ascension_type, break_level, material_slot, 
+         item_id, rarity_level, quantity, exp_required, sort_order, 
+         create_by, create_time, update_by, update_time)
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.characterId}, #{item.ascensionType}, #{item.breakLevel}, 
+             #{item.materialSlot}, #{item.itemId}, #{item.rarityLevel}, 
+             #{item.quantity}, #{item.expRequired}, #{item.sortOrder},
+             #{item.createBy}, #{item.createTime}, #{item.updateBy}, #{item.updateTime})
+        </foreach>
+    </insert>
+
+</mapper>
