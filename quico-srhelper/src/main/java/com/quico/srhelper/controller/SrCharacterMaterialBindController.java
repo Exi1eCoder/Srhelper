@@ -14,11 +14,15 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 import com.quico.common.annotation.Log;
 import com.quico.common.core.controller.BaseController;
 import com.quico.common.core.domain.AjaxResult;
 import com.quico.common.enums.BusinessType;
+import com.quico.common.utils.SecurityUtils;
 import com.quico.srhelper.domain.SrCharacterMaterialBind;
+import com.quico.srhelper.domain.dto.BindImportResult;
+import com.quico.srhelper.domain.dto.SrCharacterMaterialBindExcel;
 import com.quico.srhelper.service.ISrCharacterMaterialBindService;
 import com.quico.common.utils.poi.ExcelUtil;
 import com.quico.common.core.page.TableDataInfo;
@@ -51,16 +55,34 @@ public class SrCharacterMaterialBindController extends BaseController
     }
 
     /**
-     * 导出角色材料绑定列表
+     * 导入角色材料绑定（透视格式：一行一个角色，四列填材料名称）
      */
-    @Operation(summary = "导出角色材料绑定列表", description = "导出角色材料绑定列表为Excel文件")
+    @Operation(summary = "导入角色材料绑定", description = "通过Excel批量导入角色材料绑定，updateSupport=true 时已存在绑定的角色会被覆盖")
+    @PreAuthorize("@ss.hasPermi('srhelper:materialBind:add') or @ss.hasPermi('srhelper:materialBind:edit')")
+    @Log(title = "角色材料绑定", businessType = BusinessType.IMPORT)
+    @PostMapping("/importData")
+    public AjaxResult importData(MultipartFile file, boolean updateSupport) throws Exception
+    {
+        ExcelUtil<SrCharacterMaterialBindExcel> util = new ExcelUtil<SrCharacterMaterialBindExcel>(SrCharacterMaterialBindExcel.class);
+        List<SrCharacterMaterialBindExcel> list = util.importExcel(file.getInputStream());
+        String operName = SecurityUtils.getUserId().toString();
+        BindImportResult result = srCharacterMaterialBindService.importBindExcel(list, updateSupport, operName);
+        AjaxResult ajax = AjaxResult.success(result.getMessage());
+        ajax.put("data", result);
+        return ajax;
+    }
+
+    /**
+     * 导出角色材料绑定（透视格式：一行一个角色，世界掉落/拟造花萼/凝滞虚影/历战余响各一列）
+     */
+    @Operation(summary = "导出角色材料绑定", description = "按一行一个角色导出四类材料名称")
     @PreAuthorize("@ss.hasPermi('srhelper:materialBind:export')")
     @Log(title = "角色材料绑定", businessType = BusinessType.EXPORT)
     @PostMapping("/export")
     public void export(HttpServletResponse response, SrCharacterMaterialBind srCharacterMaterialBind)
     {
-        List<SrCharacterMaterialBind> list = srCharacterMaterialBindService.selectSrCharacterMaterialBindList(srCharacterMaterialBind);
-        ExcelUtil<SrCharacterMaterialBind> util = new ExcelUtil<SrCharacterMaterialBind>(SrCharacterMaterialBind.class);
+        List<SrCharacterMaterialBindExcel> list = srCharacterMaterialBindService.selectBindExcelList(srCharacterMaterialBind);
+        ExcelUtil<SrCharacterMaterialBindExcel> util = new ExcelUtil<SrCharacterMaterialBindExcel>(SrCharacterMaterialBindExcel.class);
         util.exportExcel(response, list, "角色材料绑定数据");
     }
 

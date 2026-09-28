@@ -50,6 +50,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         limit 1
     </select>
 
+    <select id="selectSrLightConesListByName" resultMap="SrLightConesResult">
+        <include refid="selectSrLightConesVo"/>
+        where lightcone_name = #{lightConeName}
+    </select>
+
     <insert id="insertSrLightCones" parameterType="SrLightCones" useGeneratedKeys="true" keyProperty="id">
         insert into sr_lightcone
         <trim prefix="(" suffix=")" suffixOverrides=",">

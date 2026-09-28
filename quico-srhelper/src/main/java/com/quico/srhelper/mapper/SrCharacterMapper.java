@@ -31,6 +31,14 @@ public interface SrCharacterMapper
                                                          @Param("releaseVersion") String releaseVersion);
 
     /**
+     * 按角色名字精确查询全部记录（材料绑定导入用：同名多版本时返回多条，由业务层判定）
+     *
+     * @param characterName 角色名字
+     * @return 角色列表
+     */
+    public List<SrCharacter> selectSrCharacterListByName(@Param("characterName") String characterName);
+
+    /**
      * 查询角色列表
      * 
      * @param srCharacter 角色

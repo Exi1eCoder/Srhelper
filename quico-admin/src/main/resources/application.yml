@@ -6,7 +6,7 @@ quico:
   version: 3.9.2
   # 版权年份
   copyrightYear: 2026
-  # 文件路径 示例（ Windows配置D:/ruoyi/uploadPath，Linux配置 /home/ruoyi/uploadPath）
+  # 文件路径 示例（ Windows配置D:/quico/uploadPath，Linux配置 /home/quico/uploadPath）
   profile: D:/quico/uploadPath
   # 获取ip地址开关
   addressEnabled: false

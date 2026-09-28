@@ -2,6 +2,8 @@ package com.quico.srhelper.service;
 
 import java.util.List;
 import com.quico.srhelper.domain.SrLightconeMaterialBind;
+import com.quico.srhelper.domain.dto.BindImportResult;
+import com.quico.srhelper.domain.dto.SrLightconeMaterialBindExcel;
 
 /**
  * 光锥材料绑定Service接口
@@ -58,4 +60,22 @@ public interface ISrLightconeMaterialBindService
      * @return 结果
      */
     public int deleteSrLightconeMaterialBindById(Long id);
+
+    /**
+     * 查询光锥材料绑定透视数据（一行一个光锥，世界掉落/拟造花萼各一列，取最低稀有度基础材料名）
+     *
+     * @param query 查询条件
+     * @return 透视格式数据
+     */
+    public List<SrLightconeMaterialBindExcel> selectBindExcelList(SrLightconeMaterialBind query);
+
+    /**
+     * 导入光锥材料绑定透视数据（按光锥名称匹配光锥，按材料名称匹配材料）
+     *
+     * @param list          Excel 解析的透视数据
+     * @param updateSupport 光锥已存在绑定时是否覆盖（false=跳过）
+     * @param operName      操作人ID
+     * @return 导入结果（含消息摘要与失败光锥名列表）
+     */
+    public BindImportResult importBindExcel(List<SrLightconeMaterialBindExcel> list, boolean updateSupport, String operName);
 }

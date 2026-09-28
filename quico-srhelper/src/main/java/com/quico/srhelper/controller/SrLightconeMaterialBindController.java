@@ -14,11 +14,15 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 import com.quico.common.annotation.Log;
 import com.quico.common.core.controller.BaseController;
 import com.quico.common.core.domain.AjaxResult;
 import com.quico.common.enums.BusinessType;
+import com.quico.common.utils.SecurityUtils;
 import com.quico.srhelper.domain.SrLightconeMaterialBind;
+import com.quico.srhelper.domain.dto.BindImportResult;
+import com.quico.srhelper.domain.dto.SrLightconeMaterialBindExcel;
 import com.quico.srhelper.service.ISrLightconeMaterialBindService;
 import com.quico.common.utils.poi.ExcelUtil;
 import com.quico.common.core.page.TableDataInfo;
@@ -51,16 +55,34 @@ public class SrLightconeMaterialBindController extends BaseController
     }
 
     /**
-     * 导出光锥材料绑定列表
+     * 导入光锥材料绑定（透视格式：一行一个光锥，两列填材料名称）
      */
-    @Operation(summary = "导出光锥材料绑定列表", description = "导出光锥材料绑定列表为Excel文件")
+    @Operation(summary = "导入光锥材料绑定", description = "通过Excel批量导入光锥材料绑定，updateSupport=true 时已存在绑定的光锥会被覆盖")
+    @PreAuthorize("@ss.hasPermi('srhelper:lightconeMaterialBind:add') or @ss.hasPermi('srhelper:lightconeMaterialBind:edit')")
+    @Log(title = "光锥材料绑定", businessType = BusinessType.IMPORT)
+    @PostMapping("/importData")
+    public AjaxResult importData(MultipartFile file, boolean updateSupport) throws Exception
+    {
+        ExcelUtil<SrLightconeMaterialBindExcel> util = new ExcelUtil<SrLightconeMaterialBindExcel>(SrLightconeMaterialBindExcel.class);
+        List<SrLightconeMaterialBindExcel> list = util.importExcel(file.getInputStream());
+        String operName = SecurityUtils.getUserId().toString();
+        BindImportResult result = srLightconeMaterialBindService.importBindExcel(list, updateSupport, operName);
+        AjaxResult ajax = AjaxResult.success(result.getMessage());
+        ajax.put("data", result);
+        return ajax;
+    }
+
+    /**
+     * 导出光锥材料绑定（透视格式：一行一个光锥，世界掉落/拟造花萼各一列）
+     */
+    @Operation(summary = "导出光锥材料绑定", description = "按一行一个光锥导出两类材料名称")
     @PreAuthorize("@ss.hasPermi('srhelper:lightconeMaterialBind:export')")
     @Log(title = "光锥材料绑定", businessType = BusinessType.EXPORT)
     @PostMapping("/export")
     public void export(HttpServletResponse response, SrLightconeMaterialBind srLightconeMaterialBind)
     {
-        List<SrLightconeMaterialBind> list = srLightconeMaterialBindService.selectSrLightconeMaterialBindList(srLightconeMaterialBind);
-        ExcelUtil<SrLightconeMaterialBind> util = new ExcelUtil<SrLightconeMaterialBind>(SrLightconeMaterialBind.class);
+        List<SrLightconeMaterialBindExcel> list = srLightconeMaterialBindService.selectBindExcelList(srLightconeMaterialBind);
+        ExcelUtil<SrLightconeMaterialBindExcel> util = new ExcelUtil<SrLightconeMaterialBindExcel>(SrLightconeMaterialBindExcel.class);
         util.exportExcel(response, list, "光锥材料绑定数据");
     }
 

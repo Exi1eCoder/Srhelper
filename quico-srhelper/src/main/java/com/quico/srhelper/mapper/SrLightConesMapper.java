@@ -31,6 +31,14 @@ public interface SrLightConesMapper
     @Param("releaseVersion") String releaseVersion);
 
     /**
+     * 按光锥名称精确查询全部记录（材料绑定导入用：同名多版本时返回多条，由业务层判定）
+     *
+     * @param lightConeName 光锥名称
+     * @return 光锥列表
+     */
+    public List<SrLightCones> selectSrLightConesListByName(@Param("lightConeName") String lightConeName);
+
+    /**
      * 查询光锥一览列表
      * 
      * @param srLightCones 光锥一览
