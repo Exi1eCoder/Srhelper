@@ -67,11 +67,9 @@ public class AscensionMaterialGenerator {
         // 1. 确定使用哪个模板
         String templateType = resolveTemplateType(character);
 
-        // 2. 加载模板数据
-        List<SrCharacterAscensionTemplate> templates = templateMapper.selectByTemplateType(templateType);
-
-        // 3. 按命途展开模板（skill→talent/ultimate, basicAtk→memosprite, etc.）
-        List<SrCharacterAscensionTemplate> expanded = expandTemplates(templates, character, templateType);
+        // 2-3. 加载基础模板并按命途合并、展开
+        // 记忆/欢愉模板表只存与普通五星不同的差异条目，需先继承 FiveStarNormal 全部条目再覆盖，最后展开
+        List<SrCharacterAscensionTemplate> expanded = loadExpandedTemplates(templateType);
 
         // 4. 加载材料绑定用于占位符替换 + itemId→rarity 映射
         Map<String, Long> placeholderMap = buildPlaceholderMap(characterId);
@@ -142,30 +140,72 @@ public class AscensionMaterialGenerator {
     // ======================== 模板展开 ========================
 
     /**
-     * 根据命途展开模板
-     * - 所有角色：skill → talent + ultimate
-     * - 记忆：在基础上，basicatk → memospriteskill + memospritetalent
-     * - 欢愉：在基础上，skill → elationskill
+     * 加载并展开模板
+     * 模板继承关系（以模板表真实数据为准）：
+     * - 四星(FourStarNormal)：独立完整模板，仅做通用展开 skill → talent + ultimate
+     * - 普通五星(FiveStarNormal)：完整模板，仅做通用展开 skill → talent + ultimate
+     * - 记忆(Remembrance)：继承 FiveStarNormal 全部条目（等级突破/普攻/战技/额外能力/额外属性），
+     *   模板表中的记忆专属行（basicatk/skill）按 类型+突破等级+槽位 覆盖基础条目，
+     *   再展开 skill → talent + ultimate、basicatk → memospriteskill + memospritetalent
+     * - 欢愉(Elation)：继承 FiveStarNormal 全部条目（模板表可无专属行），
+     *   再展开 skill → talent + ultimate、skill → elationskill
      */
-    private List<SrCharacterAscensionTemplate> expandTemplates(
-            List<SrCharacterAscensionTemplate> templates, SrCharacter character, String templateType) {
+    private List<SrCharacterAscensionTemplate> loadExpandedTemplates(String templateType) {
 
-        List<SrCharacterAscensionTemplate> result = new ArrayList<>(templates);
+        // 四星模板独立完整，不继承五星
+        if (TPL_FOUR_STAR_NORMAL.equals(templateType)) {
+            List<SrCharacterAscensionTemplate> fourStar = templateMapper.selectByTemplateType(templateType);
+            List<SrCharacterAscensionTemplate> result = new ArrayList<>(fourStar);
+            expandSkillToTalentAndUltimate(fourStar, result);
+            return result;
+        }
 
-        // 通用展开：skill → talent + ultimate（四星和五星都需要）
-        expandSkillToTalentAndUltimate(templates, result);
+        // 五星体系：以 FiveStarNormal 为底，命途专属行覆盖
+        List<SrCharacterAscensionTemplate> base = templateMapper.selectByTemplateType(TPL_FIVE_STAR_NORMAL);
+        List<SrCharacterAscensionTemplate> merged = base;
+        if (TPL_REMEMBRANCE.equals(templateType) || TPL_ELATION.equals(templateType)) {
+            List<SrCharacterAscensionTemplate> override = templateMapper.selectByTemplateType(templateType);
+            merged = mergeOverride(base, override);
+        }
+
+        // 在合并后的模板上统一展开
+        List<SrCharacterAscensionTemplate> result = new ArrayList<>(merged);
+
+        // 通用展开：skill → talent + ultimate
+        expandSkillToTalentAndUltimate(merged, result);
 
         // 记忆命途：basicatk → memospriteskill + memospritetalent
         if (TPL_REMEMBRANCE.equals(templateType)) {
-            expandBasicAtkToMemosprite(templates, result);
+            expandBasicAtkToMemosprite(merged, result);
         }
 
         // 欢愉命途：skill → elationskill
         if (TPL_ELATION.equals(templateType)) {
-            expandSkillToElation(templates, result);
+            expandSkillToElation(merged, result);
         }
 
         return result;
+    }
+
+    /**
+     * 用命途专属模板覆盖基础模板
+     * 按 ascensionType + breakLevel + materialSlot 匹配：命中则覆盖（保留基础条目位置），
+     * 未命中则追加；基础模板有而专属模板没有的条目（如记忆的等级突破/额外能力/额外属性）原样保留
+     */
+    private List<SrCharacterAscensionTemplate> mergeOverride(
+            List<SrCharacterAscensionTemplate> base, List<SrCharacterAscensionTemplate> override) {
+        Map<String, SrCharacterAscensionTemplate> merged = new LinkedHashMap<>();
+        for (SrCharacterAscensionTemplate tpl : base) {
+            merged.put(templateKey(tpl), tpl);
+        }
+        for (SrCharacterAscensionTemplate tpl : override) {
+            merged.put(templateKey(tpl), tpl);
+        }
+        return new ArrayList<>(merged.values());
+    }
+
+    private String templateKey(SrCharacterAscensionTemplate tpl) {
+        return tpl.getAscensionType() + "|" + tpl.getBreakLevel() + "|" + tpl.getMaterialSlot();
     }
 
     /**
