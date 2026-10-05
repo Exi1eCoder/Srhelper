@@ -53,7 +53,7 @@ public class SrLightConeAscensionController extends BaseController
      * 查询光锥晋升材料列表
      */
     @Operation(summary = "查询光锥晋升材料列表", description = "分页查询光锥晋升材料信息")
-    @PreAuthorize("@ss.hasPermi('srhelper:lightCones:list')")
+    @PreAuthorize("@ss.hasPermi('srhelper:lightcones:list')")
     @GetMapping("/list")
     public TableDataInfo list(SrLightConeAscension srLightConeAscension)
     {
@@ -66,7 +66,7 @@ public class SrLightConeAscensionController extends BaseController
      * 获取光锥晋升材料详细信息
      */
     @Operation(summary = "获取光锥晋升材料详细信息", description = "根据ID获取光锥晋升材料详细信息")
-    @PreAuthorize("@ss.hasPermi('srhelper:lightCones:query')")
+    @PreAuthorize("@ss.hasPermi('srhelper:lightcones:query')")
     @GetMapping(value = "/{id}")
     public AjaxResult getInfo(@PathVariable("id") Long id)
     {
@@ -77,7 +77,7 @@ public class SrLightConeAscensionController extends BaseController
      * 根据光锥ID查询所有晋升材料
      */
     @Operation(summary = "查询指定光锥的所有晋升材料", description = "根据光锥ID查询对应的所有晋升材料")
-    @PreAuthorize("@ss.hasPermi('srhelper:lightCones:query')")
+    @PreAuthorize("@ss.hasPermi('srhelper:lightcones:query')")
     @GetMapping("/cone/{lightConeId}")
     public AjaxResult getByConeId(@PathVariable("lightConeId") Long lightConeId)
     {
@@ -100,7 +100,7 @@ public class SrLightConeAscensionController extends BaseController
      * 新增光锥晋升材料
      */
     @Operation(summary = "新增光锥晋升材料", description = "新增光锥晋升材料")
-    @PreAuthorize("@ss.hasPermi('srhelper:lightCones:add')")
+    @PreAuthorize("@ss.hasPermi('srhelper:lightcones:add')")
     @Log(title = "光锥晋升材料", businessType = BusinessType.INSERT)
     @PostMapping
     public AjaxResult add(@RequestBody SrLightConeAscension srLightConeAscension)
@@ -112,7 +112,7 @@ public class SrLightConeAscensionController extends BaseController
      * 修改光锥晋升材料
      */
     @Operation(summary = "修改光锥晋升材料", description = "更新光锥晋升材料信息")
-    @PreAuthorize("@ss.hasPermi('srhelper:lightCones:edit')")
+    @PreAuthorize("@ss.hasPermi('srhelper:lightcones:edit')")
     @Log(title = "光锥晋升材料", businessType = BusinessType.UPDATE)
     @PutMapping
     public AjaxResult edit(@RequestBody SrLightConeAscension srLightConeAscension)
@@ -124,7 +124,7 @@ public class SrLightConeAscensionController extends BaseController
      * 删除光锥晋升材料
      */
     @Operation(summary = "删除光锥晋升材料", description = "批量删除光锥晋升材料信息")
-    @PreAuthorize("@ss.hasPermi('srhelper:lightCones:remove')")
+    @PreAuthorize("@ss.hasPermi('srhelper:lightcones:remove')")
     @Log(title = "光锥晋升材料", businessType = BusinessType.DELETE)
     @DeleteMapping("/{ids}")
     public AjaxResult remove(@PathVariable Long[] ids)
@@ -136,7 +136,7 @@ public class SrLightConeAscensionController extends BaseController
      * 批量保存光锥晋升材料（先删后增）
      */
     @Operation(summary = "批量保存光锥晋升材料", description = "先清空指定光锥的所有晋升材料，再批量插入")
-    @PreAuthorize("@ss.hasPermi('srhelper:lightCones:add')")
+    @PreAuthorize("@ss.hasPermi('srhelper:lightcones:add')")
     @Log(title = "光锥晋升材料", businessType = BusinessType.INSERT)
     @PostMapping("/batch")
     public AjaxResult batchSave(@RequestBody LightConeAscensionBatchSaveDTO dto)
@@ -149,7 +149,7 @@ public class SrLightConeAscensionController extends BaseController
      * 根据光锥ID删除所有晋升材料
      */
     @Operation(summary = "根据光锥ID删除所有晋升材料", description = "删除指定光锥的全部晋升材料")
-    @PreAuthorize("@ss.hasPermi('srhelper:lightCones:remove')")
+    @PreAuthorize("@ss.hasPermi('srhelper:lightcones:remove')")
     @Log(title = "光锥晋升材料", businessType = BusinessType.DELETE)
     @DeleteMapping("/cone/{lightConeId}")
     public AjaxResult removeByConeId(@PathVariable Long lightConeId)

@@ -1,6 +1,7 @@
 package com.quico.srhelper.controller;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -254,7 +255,7 @@ public class SrGachaRecordController extends BaseController
     /**
      * 解析时间字符串
      */
-    private java.util.Date parseTime(String timeStr)
+    private Date parseTime(String timeStr)
     {
         if (timeStr == null || timeStr.isEmpty())
         {

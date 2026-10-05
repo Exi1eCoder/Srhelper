@@ -48,7 +48,7 @@ public class SrItemController extends BaseController
     @GetMapping("/list")
     public TableDataInfo list(SrItem srItem)
     {
-        startPage();
+        // startPage();
         List<SrItem> list = srItemService.selectSrItemList(srItem);
         return getDataTable(list);
     }

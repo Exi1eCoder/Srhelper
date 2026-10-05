@@ -44,11 +44,10 @@ public class SrLightConesController extends BaseController
      * 查询光锥一览列表
      */
     @Operation(summary = "查询光锥一览列表", description = "分页查询光锥一览信息")
-    @PreAuthorize("@ss.hasPermi('srhelper:lightCones:list')")
+    @PreAuthorize("@ss.hasPermi('srhelper:lightcones:list')")
     @GetMapping("/list")
     public TableDataInfo list(SrLightCones srLightCones)
     {
-        startPage();
         List<SrLightCones> list = srLightConesService.selectSrLightConesList(srLightCones);
         return getDataTable(list);
     }
@@ -58,7 +57,7 @@ public class SrLightConesController extends BaseController
      * 导入光锥数据（与 export 配套，按光锥名字 + 实装版本去重）
      */
     @Operation(summary = "导入光锥数据", description = "通过Excel批量导入光锥基本信息，updateSupport=true 时已存在记录会被更新")
-    @PreAuthorize("@ss.hasPermi('srhelper:lightCones:add') or @ss.hasPermi('srhelper:lightCones:edit')")
+    @PreAuthorize("@ss.hasPermi('srhelper:lightcones:add') or @ss.hasPermi('srhelper:lightCones:edit')")
     @Log(title = "光锥一览", businessType = BusinessType.IMPORT)
     @PostMapping("/importData")
     public AjaxResult importData(MultipartFile file, boolean updateSupport) throws Exception
@@ -75,7 +74,7 @@ public class SrLightConesController extends BaseController
      * 导出光锥一览列表
      */
     @Operation(summary = "导出光锥一览列表", description = "导出光锥一览列表为Excel文件")
-    @PreAuthorize("@ss.hasPermi('srhelper:lightCones:export')")
+    @PreAuthorize("@ss.hasPermi('srhelper:lightcones:export')")
     @Log(title = "光锥一览", businessType = BusinessType.EXPORT)
     @PostMapping("/export")
     public void export(HttpServletResponse response, SrLightCones srLightCones)
@@ -89,7 +88,7 @@ public class SrLightConesController extends BaseController
      * 获取光锥一览详细信息
      */
     @Operation(summary = "获取光锥一览详细信息", description = "根据ID获取光锥一览详细信息")
-    @PreAuthorize("@ss.hasPermi('srhelper:lightCones:query')")
+    @PreAuthorize("@ss.hasPermi('srhelper:lightcones:query')")
     @GetMapping(value = "/{id}")
     public AjaxResult getInfo(@PathVariable("id") Long id)
     {
@@ -100,7 +99,7 @@ public class SrLightConesController extends BaseController
      * 获取光锥详情（含材料绑定）
      */
     @Operation(summary = "获取光锥详情", description = "根据ID获取光锥信息及其材料绑定")
-    @PreAuthorize("@ss.hasPermi('srhelper:lightCones:query')")
+    @PreAuthorize("@ss.hasPermi('srhelper:lightcones:query')")
     @GetMapping("/detail/{id}")
     public AjaxResult getDetail(@PathVariable("id") Long id) {
         return success(srLightConesService.getDetail(id));
@@ -110,7 +109,7 @@ public class SrLightConesController extends BaseController
      * 新增光锥一览
      */
     @Operation(summary = "新增光锥一览", description = "新增光锥一览")
-    @PreAuthorize("@ss.hasPermi('srhelper:lightCones:add')")
+    @PreAuthorize("@ss.hasPermi('srhelper:lightcones:add')")
     @Log(title = "光锥一览", businessType = BusinessType.INSERT)
     @PostMapping
     public AjaxResult add(@RequestBody SrLightCones srLightCones)
@@ -123,7 +122,7 @@ public class SrLightConesController extends BaseController
      * 修改光锥一览
      */
     @Operation(summary = "修改光锥一览", description = "更新光锥一览信息")
-    @PreAuthorize("@ss.hasPermi('srhelper:lightCones:edit')")
+    @PreAuthorize("@ss.hasPermi('srhelper:lightcones:edit')")
     @Log(title = "光锥一览", businessType = BusinessType.UPDATE)
     @PutMapping
     public AjaxResult edit(@RequestBody SrLightCones srLightCones)
@@ -135,7 +134,7 @@ public class SrLightConesController extends BaseController
      * 删除光锥一览
      */
     @Operation(summary = "删除光锥一览", description = "批量删除光锥一览信息")
-    @PreAuthorize("@ss.hasPermi('srhelper:lightCones:remove')")
+    @PreAuthorize("@ss.hasPermi('srhelper:lightcones:remove')")
     @Log(title = "光锥一览", businessType = BusinessType.DELETE)
 	@DeleteMapping("/{ids}")
     public AjaxResult remove(@PathVariable Long[] ids)
@@ -147,7 +146,7 @@ public class SrLightConesController extends BaseController
      * 统一保存/更新光锥及材料绑定
      */
     @Operation(summary = "保存光锥及材料绑定", description = "保存或更新光锥信息及其材料绑定")
-    @PreAuthorize("@ss.hasPermi('srhelper:lightCones:add') or @ss.hasPermi('srhelper:lightCones:edit')")
+    @PreAuthorize("@ss.hasPermi('srhelper:lightcones:add') or @ss.hasPermi('srhelper:lightcones:edit')")
     @Log(title = "光锥", businessType = BusinessType.INSERT)
     @PostMapping("/saveAll")
     public AjaxResult saveAll(@RequestBody LightConeSaveDTO dto)

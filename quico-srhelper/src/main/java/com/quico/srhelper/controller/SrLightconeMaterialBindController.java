@@ -49,7 +49,6 @@ public class SrLightconeMaterialBindController extends BaseController
     @GetMapping("/list")
     public TableDataInfo list(SrLightconeMaterialBind srLightconeMaterialBind)
     {
-        startPage();
         List<SrLightconeMaterialBind> list = srLightconeMaterialBindService.selectSrLightconeMaterialBindList(srLightconeMaterialBind);
         return getDataTable(list);
     }

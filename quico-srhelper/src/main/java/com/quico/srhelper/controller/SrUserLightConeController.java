@@ -50,7 +50,7 @@ public class SrUserLightConeController extends BaseController
     @GetMapping("/list")
     public TableDataInfo list(SrUserLightCone srUserLightCone)
     {
-        startPage();
+        // startPage();
         List<SrUserLightCone> list = srUserLightConeService.selectSrUserLightConeList(srUserLightCone);
         return getDataTable(list);
     }

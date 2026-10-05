@@ -41,6 +41,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="uid != null  and uid != ''"> and uid = #{uid}</if>
             <if test="createBy != null  and createBy != ''"> and create_by = #{createBy}</if>
         </where>
+        ORDER BY gacha_record_id DESC
     </select>
     
     <select id="selectSrGachaRecordByGachaRecordId" parameterType="String" resultMap="SrGachaRecordResult">

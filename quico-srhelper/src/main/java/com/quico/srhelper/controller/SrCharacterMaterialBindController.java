@@ -49,7 +49,6 @@ public class SrCharacterMaterialBindController extends BaseController
     @GetMapping("/list")
     public TableDataInfo list(SrCharacterMaterialBind srCharacterMaterialBind)
     {
-        startPage();
         List<SrCharacterMaterialBind> list = srCharacterMaterialBindService.selectSrCharacterMaterialBindList(srCharacterMaterialBind);
         return getDataTable(list);
     }

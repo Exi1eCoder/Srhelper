@@ -48,7 +48,6 @@ public class SrCharacterController extends BaseController
     @GetMapping("/list")
     public TableDataInfo list(SrCharacter srCharacter)
     {
-        startPage();
         List<SrCharacter> list = srCharacterService.selectSrCharacterList(srCharacter);
         return getDataTable(list);
     }
