@@ -1,6 +1,7 @@
 package com.quico.srhelper.controller;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -32,6 +33,8 @@ import com.quico.common.enums.BusinessType;
 import com.quico.common.utils.DateUtils;
 import com.quico.common.utils.SecurityUtils;
 import com.quico.srhelper.domain.SrGachaRecord;
+import com.quico.srhelper.domain.dto.GachaImportResult;
+import com.quico.srhelper.service.GachaRecalcService;
 import com.quico.srhelper.service.ISrGachaRecordService;
 import com.quico.common.utils.poi.ExcelUtil;
 import com.quico.common.core.page.TableDataInfo;
@@ -51,6 +54,9 @@ public class SrGachaRecordController extends BaseController
 {
     @Autowired
     private ISrGachaRecordService srGachaRecordService;
+
+    @Autowired
+    private GachaRecalcService gachaRecalcService;
 
     /**
      * 查询当前用户所有去重uid（游戏账号）
@@ -155,6 +161,7 @@ public class SrGachaRecordController extends BaseController
 
     /**
      * 导入跃迁记录（解析Excel的rawData sheet）
+     * 返回结构化结果：needRecalc=true 表示补录了历史数据
      */
     @Operation(summary = "导入跃迁记录", description = "从星穹铁道跃迁记录Excel的rawData sheet导入抽卡数据")
     @PreAuthorize("@ss.hasPermi('srhelper:gachaRecord:import')")
@@ -165,8 +172,49 @@ public class SrGachaRecordController extends BaseController
         List<SrGachaRecord> recordList = parseRawData(file);
         // create_by 存当前登录用户ID
         String operName = SecurityUtils.getUserId().toString();
-        String message = srGachaRecordService.importGachaRecord(recordList, updateSupport, operName);
-        return success(message);
+        GachaImportResult result = srGachaRecordService.importGachaRecord(recordList, updateSupport, operName);
+        return AjaxResult.success(result.getMessage(), result);
+    }
+
+    /**
+     * 批量查询抽卡统计重算状态
+     * 前端传入自己的 uid 集合，返回每个 uid 的状态：DONE / PROCESSING / UNKNOWN
+     * 用于判断哪些账号需要重算、是否提示用户、重算按钮是否可点
+     */
+    @Operation(summary = "批量查询重算状态", description = "传入uid集合，返回每个uid的重算状态")
+    @PreAuthorize("@ss.hasPermi('srhelper:gachaRecord:list')")
+    @GetMapping("/recalc/status")
+    public AjaxResult recalcStatus(String[] uids)
+    {
+        if (uids == null || uids.length == 0)
+        {
+            return success(new HashMap<String, String>());
+        }
+        return success(gachaRecalcService.status(Arrays.asList(uids)));
+    }
+
+    /**
+     * 手动触发抽卡统计重算（只能重算当前登录用户自己的账号）
+     * 只插队到 pending，不立即执行（凌晨 4 点集中处理）
+     */
+    @Operation(summary = "手动重算", description = "抽卡统计异常时手动提交重新计算，每天限一次")
+    @PreAuthorize("@ss.hasPermi('srhelper:gachaRecord:list')")
+    @Log(title = "跃迁记录", businessType = BusinessType.OTHER)
+    @PostMapping("/recalc/{uid}")
+    public AjaxResult recalc(@PathVariable("uid") String uid)
+    {
+        String status = gachaRecalcService.status(uid);
+        if (GachaRecalcService.STATUS_PROCESSING.equals(status))
+        {
+            return success("已在重算队列中，将在凌晨 4:00 执行");
+        }
+        String createBy = SecurityUtils.getUserId().toString();
+        String err = gachaRecalcService.triggerManual(uid, createBy);
+        if (err != null)
+        {
+            return AjaxResult.error(err);
+        }
+        return success("已提交重算，将在凌晨 4:00 执行，请次日刷新查看");
     }
 
     /**

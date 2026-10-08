@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import com.quico.common.core.domain.entity.SysDictData;
 import com.quico.common.utils.DateUtils;
@@ -11,6 +13,7 @@ import com.quico.common.utils.DictUtils;
 import com.quico.common.utils.SecurityUtils;
 import com.quico.common.utils.StringUtils;
 import com.quico.srhelper.config.GachaRecordImageCacheManager;
+import com.quico.srhelper.config.SrhelperCacheConstants;
 import com.quico.srhelper.domain.SrCharacter;
 import com.quico.srhelper.domain.SrCharacterAscensionMaterial;
 import com.quico.srhelper.domain.SrCharacterBonusAbilityMaterial;
@@ -18,6 +21,7 @@ import com.quico.srhelper.domain.SrCharacterMaterialBind;
 import com.quico.srhelper.domain.SrCharacterSkillMaterial;
 import com.quico.srhelper.domain.SrCharacterStatBonusMaterial;
 import com.quico.srhelper.domain.SrItem;
+import com.quico.srhelper.domain.cache.SrCharacterListCache;
 import com.quico.srhelper.domain.dto.MaterialItemDTO;
 import com.quico.srhelper.domain.dto.SrCharacterAscensionDTO;
 import com.quico.srhelper.domain.dto.SrCharacterBonusDTO;
@@ -41,6 +45,7 @@ import org.springframework.stereotype.Service;
 import com.quico.srhelper.service.ISrCharacterService;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.RedisTemplate;
 
 /**
  * 角色Service业务层处理
@@ -85,6 +90,12 @@ public class SrCharacterServiceImpl implements ISrCharacterService
     @Autowired
     private GachaRecordImageCacheManager imageCacheManager;
 
+    @Autowired
+    private RedisTemplate<Object, Object> redisTemplate;
+
+    /** 角色列表默认查询缓存 key（无过滤条件时的分页列表） */
+    private static final String CHAR_LIST_CACHE_KEY = SrhelperCacheConstants.CHAR_LIST_KEY + "list";
+
     /**
      * 查询角色
      * 
@@ -106,6 +117,18 @@ public class SrCharacterServiceImpl implements ISrCharacterService
     @Override
     public List<SrCharacter> selectSrCharacterList(SrCharacter srCharacter)
     {
+        if (isEmptyQuery(srCharacter))
+        {
+            SrCharacterListCache cached = (SrCharacterListCache) redisTemplate.opsForValue().get(CHAR_LIST_CACHE_KEY);
+            if (cached != null)
+            {
+                log.debug("selectSrCharacterList 命中缓存");
+                return cached.getList();
+            }
+            List<SrCharacter> list = srCharacterMapper.selectSrCharacterList(srCharacter);
+            redisTemplate.opsForValue().set(CHAR_LIST_CACHE_KEY, new SrCharacterListCache(list), SrhelperCacheConstants.TTL_CONFIG, TimeUnit.MINUTES);
+            return list;
+        }
         return srCharacterMapper.selectSrCharacterList(srCharacter);
     }
 
@@ -118,9 +141,9 @@ public class SrCharacterServiceImpl implements ISrCharacterService
     @Override
     public int insertSrCharacter(SrCharacter srCharacter)
     {
-        srCharacter.setCreateTime(DateUtils.getNowDate());
-        srCharacter.setUpdateTime(DateUtils.getNowDate());
-        return srCharacterMapper.insertSrCharacter(srCharacter);
+        int result = srCharacterMapper.insertSrCharacter(srCharacter);
+        clearCharacterListCache();
+        return result;
     }
 
     /**
@@ -137,7 +160,8 @@ public class SrCharacterServiceImpl implements ISrCharacterService
         
         // 应用层同步：更新角色名称到材料绑定表
         materialBindSyncService.syncCharacterName(srCharacter.getId(), srCharacter.getCharacterName());
-        
+
+        clearCharacterListCache();
         return result;
     }
 
@@ -162,7 +186,9 @@ public class SrCharacterServiceImpl implements ISrCharacterService
     @Override
     public int deleteSrCharacterByIds(Long[] ids)
     {
-        return srCharacterMapper.deleteSrCharacterByIds(ids);
+        int result = srCharacterMapper.deleteSrCharacterByIds(ids);
+        clearCharacterListCache();
+        return result;
     }
 
     /**
@@ -204,6 +230,7 @@ public class SrCharacterServiceImpl implements ISrCharacterService
 
         // simple 模式：仅更新基本信息，不操作材料表
         if ("simple".equals(dto.getChangeType()) || dto.getMaterialBinds() == null) {
+            clearCharacterListCache();
             return characterId;
         }
         // 2. 保存材料绑定 + 3. 生成晋升材料（仅当有材料绑定数据时）
@@ -211,6 +238,7 @@ public class SrCharacterServiceImpl implements ISrCharacterService
             saveMaterialBinds(characterId, dto.getMaterialBinds(), now);
             ascensionMaterialGenerator.generateAndSave(characterId, dto.getCharacter(), dto.getMaterialBinds());
         }
+        clearCharacterListCache();
         return characterId;
     }
 
@@ -771,6 +799,11 @@ public class SrCharacterServiceImpl implements ISrCharacterService
             resultMsg.append(failureMsg);
         }
 
+        // 有成功写入或更新时清除角色列表缓存
+        if (successNum > 0 || updateNum > 0)
+        {
+            clearCharacterListCache();
+        }
         return resultMsg.toString();
     }
 
@@ -817,5 +850,34 @@ public class SrCharacterServiceImpl implements ISrCharacterService
         {
         }
         return version;
+    }
+
+    /**
+     * 清除角色列表相关缓存（list、all 等前缀下的全部 key）
+     */
+    private void clearCharacterListCache()
+    {
+        Set<Object> keys = redisTemplate.keys(SrhelperCacheConstants.CHAR_LIST_KEY + "*");
+        if (keys != null && !keys.isEmpty())
+        {
+            redisTemplate.delete(keys);
+        }
+    }
+
+    /**
+     * 判断是否为无过滤条件的列表查询（分页参数不影响，只关注业务字段）
+     */
+    private boolean isEmptyQuery(SrCharacter srCharacter)
+    {
+        return srCharacter == null
+                || (StringUtils.isEmpty(srCharacter.getCharacterName())
+                    && StringUtils.isEmpty(srCharacter.getPath())
+                    && StringUtils.isEmpty(srCharacter.getCombatTypes())
+                    && StringUtils.isEmpty(srCharacter.getFaction())
+                    && StringUtils.isEmpty(srCharacter.getReleaseVersion())
+                    && srCharacter.getStarLevel() == null
+                    && srCharacter.getGender() == null
+                    && StringUtils.isEmpty(srCharacter.getDescription())
+                    && srCharacter.getId() == null);
     }
 }

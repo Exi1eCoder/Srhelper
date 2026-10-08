@@ -1,6 +1,7 @@
 package com.quico.srhelper.mapper;
 
 import java.util.List;
+import org.apache.ibatis.annotations.Param;
 import com.quico.srhelper.domain.SrUserLightCone;
 
 /**
@@ -29,11 +30,18 @@ public interface SrUserLightConeMapper
 
     /**
      * 根据用户ID查询持有光锥列表（包含光锥详情）
-     * 
+     *
      * @param userId 用户ID
+     * @param path 命途过滤（可选）
+     * @param starLevel 星级过滤（可选）
+     * @param lightConeName 光锥名称模糊搜索（可选）
      * @return 用户持有光锥集合（包含光锥名称、图片等）
      */
-    public List<SrUserLightCone> selectByUserIdWithDetails(Long userId);
+    public List<SrUserLightCone> selectByUserIdWithDetails(
+            @Param("userId") Long userId,
+            @Param("path") String path,
+            @Param("starLevel") Integer starLevel,
+            @Param("lightConeName") String lightConeName);
 
     /**
      * 根据ID查询持有光锥（包含光锥详情）

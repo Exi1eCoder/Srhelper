@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import com.quico.common.core.domain.entity.SysDictData;
 import com.quico.common.utils.DateUtils;
 import com.quico.common.utils.DictUtils;
@@ -18,12 +20,15 @@ import com.quico.srhelper.mapper.SrLightconeMaterialBindMapper;
 import com.quico.srhelper.domain.SrItem;
 import com.quico.srhelper.domain.SrLightCones;
 import com.quico.srhelper.domain.SrLightconeMaterialBind;
+import com.quico.srhelper.domain.cache.SrLightConesListCache;
 import com.quico.srhelper.domain.dto.LightConeSaveDTO;
 import com.quico.srhelper.service.ISrLightConesService;
 import com.quico.srhelper.service.helper.MaterialBindExpander;
 import com.quico.srhelper.service.helper.MaterialBindSyncService;
 import com.quico.srhelper.service.helper.LightconeAscensionMaterialGenerator;
 import com.quico.srhelper.config.GachaRecordImageCacheManager;
+import com.quico.srhelper.config.SrhelperCacheConstants;
+import org.springframework.data.redis.core.RedisTemplate;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -54,9 +59,15 @@ public class SrLightConesServiceImpl implements ISrLightConesService
     @Autowired
     private GachaRecordImageCacheManager imageCacheManager;
 
+    @Autowired
+    private RedisTemplate<Object, Object> redisTemplate;
+
+    /** 光锥列表默认查询缓存 key（无过滤条件时的分页列表） */
+    private static final String LIGHTCONE_LIST_CACHE_KEY = SrhelperCacheConstants.LIGHTCONE_LIST_KEY + "list";
+
     /**
      * 查询光锥一览
-     * 
+     *
      * @param id 光锥一览主键
      * @return 光锥一览
      */
@@ -75,6 +86,18 @@ public class SrLightConesServiceImpl implements ISrLightConesService
     @Override
     public List<SrLightCones> selectSrLightConesList(SrLightCones srLightCones)
     {
+        if (isEmptyQuery(srLightCones))
+        {
+            SrLightConesListCache cached = (SrLightConesListCache) redisTemplate.opsForValue().get(LIGHTCONE_LIST_CACHE_KEY);
+            if (cached != null)
+            {
+                log.debug("selectSrLightConesList 命中缓存");
+                return cached.getList();
+            }
+            List<SrLightCones> list = srLightConesMapper.selectSrLightConesList(srLightCones);
+            redisTemplate.opsForValue().set(LIGHTCONE_LIST_CACHE_KEY, new SrLightConesListCache(list), SrhelperCacheConstants.TTL_CONFIG, TimeUnit.MINUTES);
+            return list;
+        }
         return srLightConesMapper.selectSrLightConesList(srLightCones);
     }
 
@@ -92,7 +115,9 @@ public class SrLightConesServiceImpl implements ISrLightConesService
         if (srLightCones.getSortOrder() == null) {
             srLightCones.setSortOrder(System.currentTimeMillis());
         }
-        return srLightConesMapper.insertSrLightCones(srLightCones);
+        int result = srLightConesMapper.insertSrLightCones(srLightCones);
+        clearLightConeListCache();
+        return result;
     }
 
     /**
@@ -105,7 +130,9 @@ public class SrLightConesServiceImpl implements ISrLightConesService
     public int updateSrLightCones(SrLightCones srLightCones)
     {
         srLightCones.setUpdateTime(DateUtils.getNowDate());
-        return srLightConesMapper.updateSrLightCones(srLightCones);
+        int result = srLightConesMapper.updateSrLightCones(srLightCones);
+        clearLightConeListCache();
+        return result;
     }
 
     /**
@@ -117,7 +144,9 @@ public class SrLightConesServiceImpl implements ISrLightConesService
     @Override
     public int deleteSrLightConesByIds(Long[] ids)
     {
-        return srLightConesMapper.deleteSrLightConesByIds(ids);
+        int result = srLightConesMapper.deleteSrLightConesByIds(ids);
+        clearLightConeListCache();
+        return result;
     }
 
     /**
@@ -166,9 +195,9 @@ public class SrLightConesServiceImpl implements ISrLightConesService
         imageCacheManager.refresh();
 
         if("simple".equals(dto.getChangeType()) || dto.getMaterialBinds() == null){
+            clearLightConeListCache();
             return lightConeId;
         }
-
 
         // 2. 保存材料绑定（先删后插，TRA/CAL通过seriesId扩展高阶素材）
         if (dto.getMaterialBinds() != null) {
@@ -211,6 +240,7 @@ public class SrLightConesServiceImpl implements ISrLightConesService
             ascensionGenerator.generateAndSave(lightConeId, dto.getLightCone(), dto.getMaterialBinds());
         }
 
+        clearLightConeListCache();
         return lightConeId;
     }
 
@@ -352,7 +382,39 @@ public class SrLightConesServiceImpl implements ISrLightConesService
             resultMsg.append(failureMsg);
         }
 
+        // 有成功写入或更新时清除光锥列表缓存
+        if (successNum > 0 || updateNum > 0)
+        {
+            clearLightConeListCache();
+        }
         return resultMsg.toString();
+    }
+
+    /**
+     * 清除光锥列表相关缓存（前缀下的全部 key）
+     */
+    private void clearLightConeListCache()
+    {
+        Set<Object> keys = redisTemplate.keys(SrhelperCacheConstants.LIGHTCONE_LIST_KEY + "*");
+        if (keys != null && !keys.isEmpty())
+        {
+            redisTemplate.delete(keys);
+        }
+    }
+
+    /**
+     * 判断是否为无过滤条件的列表查询（分页参数不影响，只关注业务字段）
+     */
+    private boolean isEmptyQuery(SrLightCones srLightCones)
+    {
+        return srLightCones == null
+                || (StringUtils.isEmpty(srLightCones.getLightConeName())
+                    && StringUtils.isEmpty(srLightCones.getPath())
+                    && StringUtils.isEmpty(srLightCones.getTag())
+                    && StringUtils.isEmpty(srLightCones.getReleaseVersion())
+                    && StringUtils.isEmpty(srLightCones.getDescription())
+                    && srLightCones.getStarLevel() == null
+                    && srLightCones.getId() == null);
     }
 
     /**

@@ -15,10 +15,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.quico.srhelper.config.GachaRecordImageCacheManager;
+import com.quico.srhelper.domain.dto.GachaImportResult;
 import com.quico.srhelper.mapper.SrGachaRecordMapper;
 import com.quico.srhelper.domain.SrGachaRecord;
 import com.quico.srhelper.domain.vo.GachaRecordAnalysisItemVO;
 import com.quico.srhelper.domain.vo.GachaRecordAnalysisVO;
+import com.quico.srhelper.service.GachaRecalcService;
 import com.quico.srhelper.service.ISrGachaRecordService;
 
 /**
@@ -36,6 +38,9 @@ public class SrGachaRecordServiceImpl implements ISrGachaRecordService
 
     @Autowired
     private GachaRecordImageCacheManager imageCacheManager;
+
+    @Autowired
+    private GachaRecalcService gachaRecalcService;
 
     /**
      * 查询跃迁记录
@@ -119,15 +124,22 @@ public class SrGachaRecordServiceImpl implements ISrGachaRecordService
 
     /**
      * 导入跃迁记录（从Excel的rawData sheet解析）
-     * 
+     *
+     * 计数器（total_pulls / pity_count）由抽卡时间决定，不由导入顺序决定：
+     * - 纯追加（本批最小 gacha_record_id 晚于该用户已有最大流水号）：
+     *   同步接续最后一条记录的计数器，导入即正确
+     * - 历史插入（补录更早的数据）：
+     *   先以临时计数器写入保证用户可查询，再把 uid 放入 Redis 异步重算队列，
+     *   返回 needRecalc=true
+     *
      * @param list 解析后的跃迁记录列表
      * @param updateSupport 是否更新已存在数据
-     * @param operName 操作者
-     * @return 导入结果消息
+     * @param operName 操作者（平台用户ID）
+     * @return 结构化导入结果
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public String importGachaRecord(List<SrGachaRecord> list, boolean updateSupport, String operName)
+    public GachaImportResult importGachaRecord(List<SrGachaRecord> list, boolean updateSupport, String operName)
     {
         if (list == null || list.isEmpty())
         {
@@ -185,24 +197,32 @@ public class SrGachaRecordServiceImpl implements ISrGachaRecordService
             }
         }
 
-        // 4. 批量插入（含保底计算）
+        // 4. 计算新记录计数器，并收集发生历史插入的 uid
+        Set<String> historicalUids = calculateCountersForImport(toInsert);
+
+        // 5. 批量插入（计数器已计算）
         int successNum = 0;
         if (!toInsert.isEmpty())
         {
-            calculatePity(toInsert);
             srGachaRecordMapper.insertBatch(toInsert);
             successNum = toInsert.size();
         }
 
-        // 5. 批量更新
+        // 6. 更新已存在记录（单条更新，参与当前事务保证原子性）
         int updateNum = 0;
-        if (!toUpdate.isEmpty())
+        for (SrGachaRecord record : toUpdate)
         {
-            srGachaRecordMapper.updateBatch(toUpdate);
-            updateNum = toUpdate.size();
+            srGachaRecordMapper.updateSrGachaRecord(record);
+            updateNum++;
         }
 
-        // 6. 构建返回消息（只有真正的校验错误才抛异常）
+        // 7. 历史插入的 uid 提交异步重算
+        for (String uid : historicalUids)
+        {
+            gachaRecalcService.submit(uid);
+        }
+
+        // 8. 构建返回消息
         StringBuilder resultMsg = new StringBuilder();
         resultMsg.append("导入完成：新增 ").append(successNum).append(" 条");
         if (updateNum > 0)
@@ -213,76 +233,89 @@ public class SrGachaRecordServiceImpl implements ISrGachaRecordService
         {
             resultMsg.append("，跳过重复 ").append(skipNum).append(" 条");
         }
-
         if (failureNum > 0)
         {
             failureMsg.insert(0, "，" + failureNum + " 条数据格式不正确：");
             resultMsg.append(failureMsg);
         }
 
-        return resultMsg.toString();
+        boolean needRecalc = !historicalUids.isEmpty();
+        String recalcUid = historicalUids.stream().findFirst().orElse(null);
+        if (needRecalc)
+        {
+            resultMsg.append("；检测到补录历史数据，统计信息稍后自动修正。请耐心等待");
+        }
+
+        return new GachaImportResult(needRecalc, recalcUid, resultMsg.toString());
     }
 
     /**
-     * 计算总抽数和保底内抽数
-     * 按 createBy + uid + gachaId 分组，组内按抽卡时间排序：
-     * - 总抽数：从数据库该维度已有的最大总抽数继续累加
-     * - 保底内抽数：遇到五星(rankType=5)后，下一条记录从 1 开始；否则在上一条基础上 +1
+     * 为待插入记录计算计数器
+     *
+     * 按 createBy+uid 判断追加/历史插入，按 createBy+uid+gachaType 分组计算：
+     * - 纯追加：取该卡池已有最后一条记录接续，计数器导入即正确
+     * - 历史插入：同样接续算出临时值保证可查询，uid 收集后异步整体重算
+     *
+     * @return 发生历史插入的 uid 集合（需异步重算）
      */
-    private void calculatePity(List<SrGachaRecord> toInsert)
+    private Set<String> calculateCountersForImport(List<SrGachaRecord> toInsert)
     {
-        // 按 createBy + uid + gachaId 分组（保持顺序用 LinkedHashMap）
+        Set<String> historicalUids = new LinkedHashSet<>();
+        if (toInsert.isEmpty())
+        {
+            return historicalUids;
+        }
+
+        // 按 createBy+uid+gachaType 分组（保持顺序用 LinkedHashMap）
         Map<String, List<SrGachaRecord>> groupMap = new LinkedHashMap<>();
         for (SrGachaRecord record : toInsert)
         {
-            String key = buildGroupKey(record);
-            groupMap.computeIfAbsent(key, k -> new ArrayList<>()).add(record);
+            groupMap.computeIfAbsent(buildGroupKey(record), k -> new ArrayList<>()).add(record);
         }
 
-        // 每组内计算
+        // 缓存每个 createBy+uid 的已有最大流水号与历史插入判定
+        Map<String, String> maxExistingIdCache = new HashMap<>();
+
         for (List<SrGachaRecord> group : groupMap.values())
         {
-            // 组内按抽卡时间升序排序（同时间按流水号排序，保证稳定）
-            group.sort(Comparator
-                    .comparing(SrGachaRecord::getTime, Comparator.nullsFirst(Comparator.naturalOrder()))
-                    .thenComparing(SrGachaRecord::getGachaRecordId));
+            // 组内按 gacha_record_id 升序（即抽卡时间升序）
+            group.sort(Comparator.comparing(SrGachaRecord::getGachaRecordId));
 
             SrGachaRecord first = group.get(0);
-            SrGachaRecord query = new SrGachaRecord();
-            query.setCreateBy(first.getCreateBy());
-            query.setUid(first.getUid());
-            query.setGachaType(first.getGachaType());
+            String ownerKey = first.getCreateBy() + "|" + first.getUid();
 
-            // 数据库该维度已有的最大总抽数
-            Integer maxTotalPulls = srGachaRecordMapper.selectMaxTotalPulls(query);
-            int totalPulls = (maxTotalPulls != null) ? maxTotalPulls : 0;
+            String maxExistingId = maxExistingIdCache.computeIfAbsent(ownerKey,
+                    k -> srGachaRecordMapper.selectMaxRecordIdByOwner(first.getCreateBy(), first.getUid()));
 
-            // 数据库该卡池最后一条记录的保底抽数（用于接续）
-            SrGachaRecord lastRecord = srGachaRecordMapper.selectLastRecord(query);
+            // 历史插入：已有记录中存在比本批最小流水号更大的记录
+            boolean historical = maxExistingId != null
+                    && first.getGachaRecordId().compareTo(maxExistingId) < 0;
+            if (historical)
+            {
+                historicalUids.add(first.getUid());
+            }
+
+            // 追加/历史插入均先接续该卡池最后一条记录算出计数器；
+            // 历史插入的临时值随后由异步重算任务按 gacha_record_id 全量纠正
+            SrGachaRecord lastRecord = srGachaRecordMapper.selectLastByGroup(
+                    first.getCreateBy(), first.getUid(), first.getGachaType());
+            int totalPulls = (lastRecord != null && lastRecord.getTotalPulls() != null)
+                    ? lastRecord.getTotalPulls() : 0;
             int pityCount = (lastRecord != null && lastRecord.getPityCount() != null)
                     ? lastRecord.getPityCount() : 0;
 
             for (SrGachaRecord record : group)
             {
                 totalPulls++;
-
-                // 保底计算：如果上一条是五星，则本条从 1 开始；否则 +1
-                if (isFiveStar(lastRecord))
-                {
-                    pityCount = 1;
-                }
-                else
-                {
-                    pityCount++;
-                }
-
+                // 上一条是五星则本条从 1 开始，否则 +1
+                pityCount = isFiveStar(lastRecord) ? 1 : pityCount + 1;
                 record.setTotalPulls(totalPulls);
                 record.setPityCount(pityCount);
-
-                // 当前记录作为下一条的"上一条"
                 lastRecord = record;
             }
         }
+
+        return historicalUids;
     }
 
     /**

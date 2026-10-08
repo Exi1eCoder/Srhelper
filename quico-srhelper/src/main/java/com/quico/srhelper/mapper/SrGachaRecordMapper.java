@@ -79,28 +79,69 @@ public interface SrGachaRecordMapper
     public List<String> selectExistingGachaRecordIds(@Param("ids") List<String> gachaRecordIds);
 
     /**
-     * 批量更新跃迁记录
+     * 单条更新计数器（total_pulls / pity_count）
+     * 通过 SqlSessionFactory 的 ExecutorType.BATCH 批量提交，不依赖 allowMultiQueries
      *
-     * @param list 跃迁记录列表
+     * @param gachaRecordId 抽卡流水号
+     * @param totalPulls 总抽数
+     * @param pityCount 保底内抽数
      * @return 影响行数
      */
-    public int updateBatch(List<SrGachaRecord> list);
+    public int updateCounters(@Param("gachaRecordId") String gachaRecordId,
+                              @Param("totalPulls") int totalPulls,
+                              @Param("pityCount") int pityCount);
 
     /**
-     * 查询指定维度（createBy+uid+gachaType）的最大总抽数
+     * 查询指定用户（createBy+uid）已有的最大 gacha_record_id
+     * 用于判断本次导入是纯追加还是历史插入
      *
-     * @param srGachaRecord 查询条件（含 createBy、uid、gachaType）
-     * @return 该维度已有记录的最大总抽数，无记录返回 null
+     * @param createBy 平台用户ID
+     * @param uid 游戏账号
+     * @return 已有最大流水号，无记录返回 null
      */
-    public Integer selectMaxTotalPulls(SrGachaRecord srGachaRecord);
+    public String selectMaxRecordIdByOwner(@Param("createBy") String createBy,
+                                           @Param("uid") String uid);
 
     /**
-     * 查询指定卡池类型最后一条记录（按时间倒序第一条）
+     * 查询指定卡池（createBy+uid+gachaType）按流水号升序的最后一条记录
+     * 纯追加时用于接续 total_pulls / pity_count
      *
-     * @param srGachaRecord 查询条件（含 createBy、uid、gachaType）
-     * @return 该卡池类型最新的一条记录
+     * @param createBy 平台用户ID
+     * @param uid 游戏账号
+     * @param gachaType 卡池类型
+     * @return 最后一条记录，无则返回 null
      */
-    public SrGachaRecord selectLastRecord(SrGachaRecord srGachaRecord);
+    public SrGachaRecord selectLastByGroup(@Param("createBy") String createBy,
+                                           @Param("uid") String uid,
+                                           @Param("gachaType") String gachaType);
+
+    /**
+     * 查询指定用户（createBy+uid）全部记录，按 gacha_record_id 升序（重算用）
+     *
+     * @param createBy 平台用户ID
+     * @param uid 游戏账号
+     * @return 全部记录（升序）
+     */
+    public List<SrGachaRecord> selectByOwnerUidOrderByRecordId(@Param("createBy") String createBy,
+                                                               @Param("uid") String uid);
+
+    /**
+     * 根据游戏 uid 反查归属的平台用户 create_by（重算任务定位归属）
+     *
+     * @param uid 游戏账号
+     * @return create_by 列表
+     */
+    public List<String> selectCreateByByUid(@Param("uid") String uid);
+
+    /**
+     * 校验游戏 uid 是否归属于指定平台用户（手动重算权限校验）
+     *
+     * @param uid 游戏账号
+     * @param createBy 平台用户ID
+     * @return 记录数
+     */
+    public int countByUidAndCreateBy(@Param("uid") String uid,
+                                     @Param("createBy") String createBy);
 
     /**
      * 查询当前用户所有去重uid

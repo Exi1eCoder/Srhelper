@@ -129,39 +129,49 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         </foreach>
     </select>
 
-    <update id="updateBatch">
-        <foreach collection="list" item="item" separator=";">
-            update sr_gacha_record
-            <set>
-                <if test="item.gachaId != null and item.gachaId != ''">gacha_id = #{item.gachaId},</if>
-                <if test="item.gachaType != null">gacha_type = #{item.gachaType},</if>
-                <if test="item.itemId != null">item_id = #{item.itemId},</if>
-                <if test="item.itemType != null">item_type = #{item.itemType},</if>
-                <if test="item.name != null">name = #{item.name},</if>
-                <if test="item.rankType != null">rank_type = #{item.rankType},</if>
-                <if test="item.time != null">time = #{item.time},</if>
-                <if test="item.uid != null">uid = #{item.uid},</if>
-                <if test="item.updateBy != null">update_by = #{item.updateBy},</if>
-                <if test="item.updateTime != null">update_time = #{item.updateTime},</if>
-            </set>
-            where gacha_record_id = #{item.gachaRecordId}
-        </foreach>
+    <!-- 单条更新计数器（配合 ExecutorType.BATCH 批量提交，不拼接多语句） -->
+    <update id="updateCounters">
+        update sr_gacha_record
+        set total_pulls = #{totalPulls},
+            pity_count = #{pityCount}
+        where gacha_record_id = #{gachaRecordId}
     </update>
 
-    <select id="selectMaxTotalPulls" parameterType="SrGachaRecord" resultType="java.lang.Integer">
-        select max(total_pulls) from sr_gacha_record
+    <!-- 指定用户已有最大流水号（判断追加/历史插入） -->
+    <select id="selectMaxRecordIdByOwner" resultType="java.lang.String">
+        select max(gacha_record_id) from sr_gacha_record
         where create_by = #{createBy}
           and uid = #{uid}
-          and gacha_type = #{gachaType}
     </select>
 
-    <select id="selectLastRecord" parameterType="SrGachaRecord" resultMap="SrGachaRecordResult">
+    <!-- 指定卡池按流水号升序的最后一条（追加时接续计数器） -->
+    <select id="selectLastByGroup" resultMap="SrGachaRecordResult">
         <include refid="selectSrGachaRecordVo"/>
         where create_by = #{createBy}
           and uid = #{uid}
           and gacha_type = #{gachaType}
-        order by time desc, gacha_record_id desc
+        order by gacha_record_id desc
         limit 1
+    </select>
+
+    <!-- 指定用户全部记录按流水号升序（重算用） -->
+    <select id="selectByOwnerUidOrderByRecordId" resultMap="SrGachaRecordResult">
+        <include refid="selectSrGachaRecordVo"/>
+        where create_by = #{createBy}
+          and uid = #{uid}
+        order by gacha_record_id asc
+    </select>
+
+    <!-- 根据游戏 uid 反查归属平台用户 -->
+    <select id="selectCreateByByUid" resultType="java.lang.String">
+        select distinct create_by from sr_gacha_record
+        where uid = #{uid} and create_by is not null
+    </select>
+
+    <!-- 手动重算归属校验 -->
+    <select id="countByUidAndCreateBy" resultType="java.lang.Integer">
+        select count(1) from sr_gacha_record
+        where uid = #{uid} and create_by = #{createBy}
     </select>
 
     <select id="selectDistinctUidList" parameterType="SrGachaRecord" resultType="java.lang.String">

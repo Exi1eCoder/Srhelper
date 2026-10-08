@@ -2,8 +2,8 @@ package com.quico.srhelper.service;
 
 import java.util.List;
 import com.quico.srhelper.domain.SrGachaRecord;
+import com.quico.srhelper.domain.dto.GachaImportResult;
 import com.quico.srhelper.domain.vo.GachaRecordAnalysisResultVO;
-import com.quico.srhelper.domain.vo.GachaRecordAnalysisVO;
 
 /**
  * 跃迁记录Service接口
@@ -63,13 +63,13 @@ public interface ISrGachaRecordService
 
     /**
      * 导入跃迁记录（从Excel的rawData sheet解析）
-     * 
+     *
      * @param list 解析后的跃迁记录列表
      * @param updateSupport 是否更新已存在数据
      * @param operName 操作者
-     * @return 导入结果消息
+     * @return 结构化导入结果（含 needRecalc/uid/message）
      */
-    public String importGachaRecord(List<SrGachaRecord> list, boolean updateSupport, String operName);
+    public GachaImportResult importGachaRecord(List<SrGachaRecord> list, boolean updateSupport, String operName);
 
     /**
      * 抽卡分析：按卡池类型分组返回五星记录

@@ -3,6 +3,8 @@ package com.quico.srhelper.service.impl;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import com.quico.common.core.domain.entity.SysDictData;
 import com.quico.common.utils.DateUtils;
 import com.quico.common.utils.DictUtils;
@@ -14,9 +16,13 @@ import org.springframework.transaction.annotation.Transactional;
 import com.quico.srhelper.mapper.SrItemMapper;
 import com.quico.srhelper.service.helper.MaterialBindSyncService;
 import com.quico.srhelper.domain.SrItem;
+import com.quico.srhelper.domain.cache.SrItemListCache;
 import com.quico.srhelper.domain.dto.SrItemBindDTO;
 import com.quico.srhelper.domain.vo.SrItemDetailVO;
 import com.quico.srhelper.service.ISrItemService;
+import com.quico.srhelper.config.SrhelperCacheConstants;
+import org.springframework.data.redis.core.RedisTemplate;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * 材料一览Service业务层处理
@@ -25,6 +31,7 @@ import com.quico.srhelper.service.ISrItemService;
  * @date 2026-05-25
  */
 @Service
+@Slf4j
 public class SrItemServiceImpl implements ISrItemService 
 {
     @Autowired
@@ -33,9 +40,15 @@ public class SrItemServiceImpl implements ISrItemService
     @Autowired
     private MaterialBindSyncService materialBindSyncService;
 
+    @Autowired
+    private RedisTemplate<Object, Object> redisTemplate;
+
+    /** 物品列表默认查询缓存 key */
+    private static final String ITEM_LIST_CACHE_KEY = SrhelperCacheConstants.ITEM_LIST_KEY + "list";
+
     /**
      * 查询材料一览
-     * 
+     *
      * @param id 材料一览主键
      * @return 材料一览
      */
@@ -93,6 +106,18 @@ public class SrItemServiceImpl implements ISrItemService
     @Override
     public List<SrItem> selectSrItemList(SrItem srItem)
     {
+        if (isEmptyQuery(srItem))
+        {
+            SrItemListCache cached = (SrItemListCache) redisTemplate.opsForValue().get(ITEM_LIST_CACHE_KEY);
+            if (cached != null)
+            {
+                log.debug("selectSrItemList 命中缓存");
+                return cached.getList();
+            }
+            List<SrItem> list = srItemMapper.selectSrItemList(srItem);
+            redisTemplate.opsForValue().set(ITEM_LIST_CACHE_KEY, new SrItemListCache(list), SrhelperCacheConstants.TTL_CONFIG, TimeUnit.MINUTES);
+            return list;
+        }
         return srItemMapper.selectSrItemList(srItem);
     }
 
@@ -110,7 +135,9 @@ public class SrItemServiceImpl implements ISrItemService
         if (srItem.getSortOrder() == null) {
             srItem.setSortOrder(System.currentTimeMillis());
         }
-        return srItemMapper.insertSrItem(srItem);
+        int result = srItemMapper.insertSrItem(srItem);
+        clearItemListCache();
+        return result;
     }
 
     /**
@@ -137,7 +164,8 @@ public class SrItemServiceImpl implements ISrItemService
         if (srItem.getSeriesId() != null) {
             materialBindSyncService.syncItemSeriesId(srItem.getId(), srItem.getSeriesId());
         }
-        
+
+        clearItemListCache();
         return result;
     }
     
@@ -193,7 +221,9 @@ public class SrItemServiceImpl implements ISrItemService
     @Override
     public int deleteSrItemByIds(Long[] ids)
     {
-        return srItemMapper.deleteSrItemByIds(ids);
+        int result = srItemMapper.deleteSrItemByIds(ids);
+        clearItemListCache();
+        return result;
     }
 
     /**
@@ -335,6 +365,9 @@ public class SrItemServiceImpl implements ISrItemService
             resultMsg.append(failureMsg);
         }
 
+        if(successNum >0 || updateNum > 0){
+            clearItemListCache();
+        }
         return resultMsg.toString();
     }
 
@@ -381,5 +414,33 @@ public class SrItemServiceImpl implements ISrItemService
         {
         }
         return version;
+    }
+
+    /**
+     * 清除物品列表相关缓存（前缀下的全部 key）
+     */
+    private void clearItemListCache()
+    {
+        Set<Object> keys = redisTemplate.keys(SrhelperCacheConstants.ITEM_LIST_KEY + "*");
+        if (keys != null && !keys.isEmpty())
+        {
+            redisTemplate.delete(keys);
+        }
+    }
+
+    /**
+     * 判断是否为无过滤条件的列表查询
+     */
+    private boolean isEmptyQuery(SrItem srItem)
+    {
+        return srItem == null
+                || (StringUtils.isEmpty(srItem.getItemName())
+                    && StringUtils.isEmpty(srItem.getItemType())
+                    // && StringUtils.isEmpty(srItem.getItemTag())
+                    && StringUtils.isEmpty(srItem.getDescription())
+                    && StringUtils.isEmpty(srItem.getReleaseVersion())
+                    && srItem.getStarLevel() == null
+                    && srItem.getId() == null
+                    && srItem.getSeriesId() == null);
     }
 }

@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.quico.common.annotation.Log;
 import com.quico.common.core.controller.BaseController;
@@ -59,10 +60,13 @@ public class SrUserLightConeController extends BaseController
      * 获取当前登录用户的持有光锥列表（包含光锥详情）
      */
     @GetMapping("/user")
-    public AjaxResult getCurrentUserLightCones()
+    public AjaxResult getCurrentUserLightCones(
+            @RequestParam(required = false) String path,
+            @RequestParam(required = false) Integer starLevel,
+            @RequestParam(required = false) String lightConeName)
     {
         Long userId = getUserId();
-        List<SrUserLightCone> list = srUserLightConeService.selectByUserIdWithDetails(userId);
+        List<SrUserLightCone> list = srUserLightConeService.selectByUserIdWithDetails(userId, path, starLevel, lightConeName);
         return success(list);
     }
 
@@ -70,13 +74,17 @@ public class SrUserLightConeController extends BaseController
      * 根据用户ID查询持有光锥列表（包含光锥详情）
      */
     @GetMapping("/user/{userId}")
-    public AjaxResult getByUserId(@PathVariable("userId") Long userId)
+    public AjaxResult getByUserId(
+            @PathVariable("userId") Long userId,
+            @RequestParam(required = false) String path,
+            @RequestParam(required = false) Integer starLevel,
+            @RequestParam(required = false) String lightConeName)
     {
         if (userId == null || userId <= 0)
         {
             return AjaxResult.error("用户ID参数无效");
         }
-        List<SrUserLightCone> list = srUserLightConeService.selectByUserIdWithDetails(userId);
+        List<SrUserLightCone> list = srUserLightConeService.selectByUserIdWithDetails(userId, path, starLevel, lightConeName);
         return success(list);
     }
 

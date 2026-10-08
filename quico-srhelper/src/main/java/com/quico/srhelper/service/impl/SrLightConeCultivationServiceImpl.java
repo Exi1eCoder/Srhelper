@@ -136,8 +136,8 @@ public class SrLightConeCultivationServiceImpl implements ISrLightConeCultivatio
         
         SrLightConeCultivationVO result = new SrLightConeCultivationVO();
         
-        // 查询用户所有光锥
-        List<SrUserLightCone> userLightCones = userLightConeMapper.selectByUserIdWithDetails(userId);
+        // 查询用户所有光锥（养成计算不需要过滤条件）
+        List<SrUserLightCone> userLightCones = userLightConeMapper.selectByUserIdWithDetails(userId, null, null, null);
         
         // 计算总体材料需求
         Map<Long, Long> totalMaterialMap = new HashMap<>();

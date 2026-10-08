@@ -46,13 +46,22 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where id = #{id}
     </select>
 
-    <select id="selectByUserIdWithDetails" parameterType="Long" resultMap="SrUserLightConeWithDetailsResult">
+    <select id="selectByUserIdWithDetails" resultMap="SrUserLightConeWithDetailsResult">
         select ulc.id, ulc.user_id, ulc.lightcone_id, ulc.level, ulc.superimposition,
                ulc.create_by, ulc.create_time, ulc.update_by, ulc.update_time, ulc.remark,
                lc.lightcone_name, lc.image, lc.star_level, lc.path
         from sr_user_lightcone ulc
         left join sr_lightcone lc on ulc.lightcone_id = lc.id
         where ulc.user_id = #{userId}
+        <if test="path != null and path != ''">
+            and lc.path = #{path}
+        </if>
+        <if test="starLevel != null">
+            and lc.star_level = #{starLevel}
+        </if>
+        <if test="lightConeName != null and lightConeName != ''">
+            and lc.lightcone_name like concat('%', #{lightConeName}, '%')
+        </if>
         order by lc.sort_order desc, ulc.level desc, ulc.superimposition desc
     </select>
 

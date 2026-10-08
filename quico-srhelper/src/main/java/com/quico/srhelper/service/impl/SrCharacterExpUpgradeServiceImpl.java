@@ -3,6 +3,7 @@ package com.quico.srhelper.service.impl;
 import com.quico.srhelper.config.SrhelperCacheConstants;
 import com.quico.srhelper.domain.SrCharacterExpUpgrade;
 import com.quico.srhelper.domain.SrItem;
+import com.quico.srhelper.domain.cache.SrCharacterExpUpgradeCache;
 import com.quico.srhelper.domain.dto.SrCharacterExpUpgradeDTO;
 
 import com.quico.srhelper.domain.vo.SrCharacterExpUpgradeVO;
@@ -10,11 +11,13 @@ import com.quico.srhelper.mapper.SrCharacterExpUpgradeMapper;
 import com.quico.srhelper.mapper.SrItemMapper;
 import com.quico.srhelper.service.ISrCharacterExpUpgradeService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -23,6 +26,7 @@ import java.util.stream.Collectors;
  */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class SrCharacterExpUpgradeServiceImpl implements ISrCharacterExpUpgradeService {
     
     private final SrCharacterExpUpgradeMapper expUpgradeMapper;
@@ -33,29 +37,50 @@ public class SrCharacterExpUpgradeServiceImpl implements ISrCharacterExpUpgradeS
 
     @Override
     public List<SrCharacterExpUpgradeVO> selectAllExpUpgrades() {
-        @SuppressWarnings("unchecked")
-        List<SrCharacterExpUpgradeVO> cached = (List<SrCharacterExpUpgradeVO>) redisTemplate.opsForValue().get(CACHE_KEY);
+        SrCharacterExpUpgradeCache cached = (SrCharacterExpUpgradeCache) redisTemplate.opsForValue().get(CACHE_KEY);
         if (cached != null) {
-            return cached;
+            log.debug("selectAllExpUpgrades cached is not null, 从缓存中获取角色经验升级配置");
+            return cached.getList();
         }
+        log.debug("selectAllExpUpgrades cached is null, 从数据库中查询角色经验升级配置");
         List<SrCharacterExpUpgradeVO> list = expUpgradeMapper.selectAllOrderByMinLevel()
                 .stream()
                 .map(this::convertToVO)
                 .collect(Collectors.toList());
-        redisTemplate.opsForValue().set(CACHE_KEY, list, SrhelperCacheConstants.TTL_CONFIG, TimeUnit.MINUTES);
+        redisTemplate.opsForValue().set(CACHE_KEY, new SrCharacterExpUpgradeCache(list), SrhelperCacheConstants.TTL_CONFIG, TimeUnit.MINUTES);
         return list;
     }
     
     @Override
     public SrCharacterExpUpgradeVO selectExpUpgradeById(Long id) {
+        String cacheKey = SrhelperCacheConstants.CHAR_EXP_UPGRADE_KEY + "id:" + id;
+        SrCharacterExpUpgradeVO cached = (SrCharacterExpUpgradeVO) redisTemplate.opsForValue().get(cacheKey);
+        if (cached != null) {
+            log.debug("selectExpUpgradeById 命中缓存，id={}", id);
+            return cached;
+        }
         SrCharacterExpUpgrade entity = expUpgradeMapper.selectById(id);
-        return entity != null ? convertToVO(entity) : null;
+        SrCharacterExpUpgradeVO vo = entity != null ? convertToVO(entity) : null;
+        if (vo != null) {
+            redisTemplate.opsForValue().set(cacheKey, vo, SrhelperCacheConstants.TTL_CONFIG, TimeUnit.MINUTES);
+        }
+        return vo;
     }
-    
+
     @Override
     public SrCharacterExpUpgradeVO selectExpUpgradeByLevel(Integer level) {
+        String cacheKey = SrhelperCacheConstants.CHAR_EXP_UPGRADE_KEY + "level:" + level;
+        SrCharacterExpUpgradeVO cached = (SrCharacterExpUpgradeVO) redisTemplate.opsForValue().get(cacheKey);
+        if (cached != null) {
+            log.debug("selectExpUpgradeByLevel 命中缓存，level={}", level);
+            return cached;
+        }
         SrCharacterExpUpgrade entity = expUpgradeMapper.selectByLevel(level);
-        return entity != null ? convertToVO(entity) : null;
+        SrCharacterExpUpgradeVO vo = entity != null ? convertToVO(entity) : null;
+        if (vo != null) {
+            redisTemplate.opsForValue().set(cacheKey, vo, SrhelperCacheConstants.TTL_CONFIG, TimeUnit.MINUTES);
+        }
+        return vo;
     }
     
     @Override
@@ -96,7 +121,11 @@ public class SrCharacterExpUpgradeServiceImpl implements ISrCharacterExpUpgradeS
     }
 
     private void clearCache() {
-        redisTemplate.delete(CACHE_KEY);
+        // 删除该前缀下所有缓存（list、id:*、level:*），保证写操作后数据一致
+        Set<Object> keys = redisTemplate.keys(SrhelperCacheConstants.CHAR_EXP_UPGRADE_KEY + "*");
+        if (keys != null && !keys.isEmpty()) {
+            redisTemplate.delete(keys);
+        }
     }
     
     private SrCharacterExpUpgradeVO convertToVO(SrCharacterExpUpgrade entity) {
