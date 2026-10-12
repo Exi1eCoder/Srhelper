@@ -14,13 +14,13 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.quico.srhelper.config.GachaRecordImageCacheManager;
+import com.quico.srhelper.service.helper.GachaRecordImageCacheManager;
 import com.quico.srhelper.domain.dto.GachaImportResult;
 import com.quico.srhelper.mapper.SrGachaRecordMapper;
 import com.quico.srhelper.domain.SrGachaRecord;
 import com.quico.srhelper.domain.vo.GachaRecordAnalysisItemVO;
 import com.quico.srhelper.domain.vo.GachaRecordAnalysisVO;
-import com.quico.srhelper.service.GachaRecalcService;
+import com.quico.srhelper.service.helper.GachaRecalcService;
 import com.quico.srhelper.service.ISrGachaRecordService;
 
 /**

@@ -1,4 +1,4 @@
-package com.quico.srhelper.config;
+package com.quico.srhelper.service.helper;
 
 import java.util.List;
 import java.util.Map;

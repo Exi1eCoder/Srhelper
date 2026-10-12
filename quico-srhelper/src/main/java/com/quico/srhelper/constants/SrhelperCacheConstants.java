@@ -1,4 +1,4 @@
-package com.quico.srhelper.config;
+package com.quico.srhelper.constants;
 
 import com.quico.common.constant.CacheConstants;
 
@@ -26,9 +26,6 @@ public class SrhelperCacheConstants {
     /** 光锥经验升级配置缓存 */
     public static final String LIGHTCONE_EXP_UPGRADE_KEY = PREFIX + "lc_exp_upgrade:";
 
-    /** 养成计算缓存 */
-    public static final String CULTIVATION_KEY = PREFIX + "sr:cultivation:";
-
     /** 卡池项目图片URL缓存（本地 Caffeine） */
     public static final String GACHA_ITEM_IMAGE_KEY = PREFIX + "gacha_item_image:";
 
@@ -55,7 +52,4 @@ public class SrhelperCacheConstants {
 
     /** 配置类缓存 TTL（代理到 CacheConstants） */
     public static final long TTL_CONFIG = CacheConstants.TTL_CONFIG;
-
-    /** 计算类缓存 TTL（代理到 CacheConstants） */
-    public static final long TTL_CALC = CacheConstants.TTL_CALC;
 }

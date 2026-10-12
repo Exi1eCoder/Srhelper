@@ -2,6 +2,7 @@ package com.quico.srhelper.controller;
 
 import com.quico.common.core.domain.AjaxResult;
 import com.quico.srhelper.domain.vo.SrCharacterCultivationVO;
+import com.quico.srhelper.domain.vo.SrCharactersCultivationVO;
 import com.quico.srhelper.domain.vo.SrCultivationCalcVO;
 import com.quico.srhelper.service.ISrCultivationService;
 import com.quico.common.utils.SecurityUtils;
@@ -31,6 +32,18 @@ public class SrCultivationController {
             @Parameter(description = "目标等级，默认80") @RequestParam(required = false) Integer targetLevel) {
         Long userId = SecurityUtils.getUserId();
         SrCultivationCalcVO result = cultivationService.calculateTotalCultivation(userId, targetLevel);
+        return AjaxResult.success(result);
+    }
+    
+    /**
+     * 计算所有角色的养成材料（每个角色单独返回，不含总计）
+     */
+    @Operation(summary = "计算所有角色养成材料", description = "返回用户所有角色各自的养成材料需求，不含总计")
+    @GetMapping("/characters")
+    public AjaxResult calculateCharacters(
+            @Parameter(description = "目标等级，默认80") @RequestParam(required = false) Integer targetLevel) {
+        Long userId = SecurityUtils.getUserId();
+        SrCharactersCultivationVO result = cultivationService.calculateUserCharactersCultivation(userId, targetLevel);
         return AjaxResult.success(result);
     }
     

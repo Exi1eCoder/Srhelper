@@ -147,8 +147,8 @@ public class AscensionMaterialGenerator {
      * - 记忆(Remembrance)：继承 FiveStarNormal 全部条目（等级突破/普攻/战技/额外能力/额外属性），
      *   模板表中的记忆专属行（basicatk/skill）按 类型+突破等级+槽位 覆盖基础条目，
      *   再展开 skill → talent + ultimate、basicatk → memospriteskill + memospritetalent
-     * - 欢愉(Elation)：继承 FiveStarNormal 全部条目（模板表可无专属行），
-     *   再展开 skill → talent + ultimate、skill → elationskill
+     * - 欢愉(Elation)：仅继承 FiveStarNormal 的等级突破(levelasc)条目，
+     *   其余条目全部取自 Elation 自身模板，再展开 skill → talent + ultimate
      */
     private List<SrCharacterAscensionTemplate> loadExpandedTemplates(String templateType) {
 
@@ -161,7 +161,15 @@ public class AscensionMaterialGenerator {
         }
 
         // 五星体系：以 FiveStarNormal 为底，命途专属行覆盖
-        List<SrCharacterAscensionTemplate> base = templateMapper.selectByTemplateType(TPL_FIVE_STAR_NORMAL);
+        List<SrCharacterAscensionTemplate> base;
+        if (TPL_ELATION.equals(templateType)) {
+            // 欢愉：仅等级突破(levelasc)沿用普通五星模板，其余条目一律使用 Elation 自身模板
+            base = filterByAscensionType(
+                    templateMapper.selectByTemplateType(TPL_FIVE_STAR_NORMAL), "levelasc");
+        } else {
+            base = templateMapper.selectByTemplateType(TPL_FIVE_STAR_NORMAL);
+        }
+
         List<SrCharacterAscensionTemplate> merged = base;
         if (TPL_REMEMBRANCE.equals(templateType) || TPL_ELATION.equals(templateType)) {
             List<SrCharacterAscensionTemplate> override = templateMapper.selectByTemplateType(templateType);
@@ -179,12 +187,21 @@ public class AscensionMaterialGenerator {
             expandBasicAtkToMemosprite(merged, result);
         }
 
-        // 欢愉命途：skill → elationskill
-        if (TPL_ELATION.equals(templateType)) {
-            expandSkillToElation(merged, result);
-        }
-
         return result;
+    }
+
+    /**
+     * 过滤出指定 ascensionType 的模板条目
+     */
+    private List<SrCharacterAscensionTemplate> filterByAscensionType(
+            List<SrCharacterAscensionTemplate> templates, String ascensionType) {
+        List<SrCharacterAscensionTemplate> filtered = new ArrayList<>();
+        for (SrCharacterAscensionTemplate tpl : templates) {
+            if (ascensionType.equalsIgnoreCase(tpl.getAscensionType())) {
+                filtered.add(tpl);
+            }
+        }
+        return filtered;
     }
 
     /**
@@ -233,18 +250,6 @@ public class AscensionMaterialGenerator {
             if ("basicatk".equalsIgnoreCase(tpl.getAscensionType())) {
                 result.add(copyWithNewType(tpl, "memospriteskill"));
                 result.add(copyWithNewType(tpl, "memospritetalent"));
-            }
-        }
-    }
-
-    /**
-     * 欢愉命途：战技(skill) → 欢愉技(elationskill)
-     */
-    private void expandSkillToElation(List<SrCharacterAscensionTemplate> originals,
-                                       List<SrCharacterAscensionTemplate> result) {
-        for (SrCharacterAscensionTemplate tpl : originals) {
-            if ("skill".equalsIgnoreCase(tpl.getAscensionType())) {
-                result.add(copyWithNewType(tpl, "elationskill"));
             }
         }
     }

@@ -34,7 +34,7 @@ import com.quico.common.utils.DateUtils;
 import com.quico.common.utils.SecurityUtils;
 import com.quico.srhelper.domain.SrGachaRecord;
 import com.quico.srhelper.domain.dto.GachaImportResult;
-import com.quico.srhelper.service.GachaRecalcService;
+import com.quico.srhelper.service.helper.GachaRecalcService;
 import com.quico.srhelper.service.ISrGachaRecordService;
 import com.quico.common.utils.poi.ExcelUtil;
 import com.quico.common.core.page.TableDataInfo;

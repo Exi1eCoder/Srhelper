@@ -26,8 +26,8 @@ import com.quico.srhelper.service.ISrLightConesService;
 import com.quico.srhelper.service.helper.MaterialBindExpander;
 import com.quico.srhelper.service.helper.MaterialBindSyncService;
 import com.quico.srhelper.service.helper.LightconeAscensionMaterialGenerator;
-import com.quico.srhelper.config.GachaRecordImageCacheManager;
-import com.quico.srhelper.config.SrhelperCacheConstants;
+import com.quico.srhelper.service.helper.GachaRecordImageCacheManager;
+import com.quico.srhelper.constants.SrhelperCacheConstants;
 import org.springframework.data.redis.core.RedisTemplate;
 import lombok.extern.slf4j.Slf4j;
 

@@ -25,6 +25,8 @@ public class SrCharacterCultivationVO {
         private String characterImage;
         private Integer currentLevel;
         private Integer targetLevel;
+        /** 是否已培养完成（全等级满级且额外能力/额外属性全部为1） */
+        private Boolean isMaxLevel;
     }
     
     /** 材料需求 */

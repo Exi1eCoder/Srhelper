@@ -1,6 +1,7 @@
 package com.quico.srhelper.service;
 
 import com.quico.srhelper.domain.vo.SrCharacterCultivationVO;
+import com.quico.srhelper.domain.vo.SrCharactersCultivationVO;
 import com.quico.srhelper.domain.vo.SrCultivationCalcVO;
 
 /**
@@ -15,6 +16,14 @@ public interface ISrCultivationService {
      * @return 养成计算结果
      */
     SrCultivationCalcVO calculateTotalCultivation(Long userId, Integer targetLevel);
+    
+    /**
+     * 计算用户所有角色的养成材料（每个角色单独返回，不含总计）
+     * @param userId 用户ID
+     * @param targetLevel 目标等级（默认80）
+     * @return 各角色养成材料计算结果
+     */
+    SrCharactersCultivationVO calculateUserCharactersCultivation(Long userId, Integer targetLevel);
     
     /**
      * 计算单个角色的养成材料

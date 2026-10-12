@@ -14,7 +14,7 @@ public class SrCultivationCalcVO {
     private List<CharacterInfo> characters;
     
     /** 总体所需材料 */
-    private List<MaterialRequirement> totalMaterials;
+    private List<SrCharacterCultivationVO.MaterialRequirement> totalMaterials;
     
     /** 已满级角色列表 */
     private List<CharacterInfo> maxLevelCharacters;
@@ -29,20 +29,5 @@ public class SrCultivationCalcVO {
         private Integer currentLevel;
         private Integer targetLevel;
         private Boolean isMaxLevel;
-    }
-    
-    /** 材料需求 */
-    @Data
-    public static class MaterialRequirement {
-        private Long itemId;
-        private String itemName;
-        private String itemImage;
-        private Integer rarityLevel;
-        /** 总体所需数量 */
-        private Long requiredQuantity;
-        /** 背包拥有数量 */
-        private Long ownedQuantity;
-        /** 差额（正数表示缺少，负数表示多余） */
-        private Long difference;
     }
 }

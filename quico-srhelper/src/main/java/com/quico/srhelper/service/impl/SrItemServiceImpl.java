@@ -20,7 +20,7 @@ import com.quico.srhelper.domain.cache.SrItemListCache;
 import com.quico.srhelper.domain.dto.SrItemBindDTO;
 import com.quico.srhelper.domain.vo.SrItemDetailVO;
 import com.quico.srhelper.service.ISrItemService;
-import com.quico.srhelper.config.SrhelperCacheConstants;
+import com.quico.srhelper.constants.SrhelperCacheConstants;
 import org.springframework.data.redis.core.RedisTemplate;
 import lombok.extern.slf4j.Slf4j;
 
