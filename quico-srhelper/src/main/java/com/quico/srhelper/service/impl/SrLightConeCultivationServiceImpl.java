@@ -1,49 +1,55 @@
 package com.quico.srhelper.service.impl;
 
-import com.quico.common.core.redis.RedisCache;
 import com.quico.srhelper.domain.SrItem;
 import com.quico.srhelper.domain.SrLightConeAscension;
 import com.quico.srhelper.domain.SrLightCones;
+import com.quico.srhelper.domain.SrLightconeExpUpgrade;
+import com.quico.srhelper.domain.SrUserItem;
 import com.quico.srhelper.domain.SrUserLightCone;
+import com.quico.srhelper.domain.enums.CommonItemEnum;
+import com.quico.srhelper.domain.enums.MaterialSortEnum;
 import com.quico.srhelper.domain.vo.SrLightConeCultivationVO;
 import com.quico.srhelper.mapper.SrItemMapper;
 import com.quico.srhelper.mapper.SrLightConeAscensionMapper;
 import com.quico.srhelper.mapper.SrLightConesMapper;
+import com.quico.srhelper.mapper.SrLightconeExpUpgradeMapper;
+import com.quico.srhelper.mapper.SrUserItemMapper;
 import com.quico.srhelper.mapper.SrUserLightConeMapper;
 import com.quico.srhelper.service.ISrLightConeCultivationService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
+import java.util.Set;
 
 /**
  * 光锥养成计算Service实现类
- * 
+ *
  * @author quico
  * @date 2026-06-07
  */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class SrLightConeCultivationServiceImpl implements ISrLightConeCultivationService
 {
     private final SrUserLightConeMapper userLightConeMapper;
     private final SrLightConesMapper lightConesMapper;
     private final SrLightConeAscensionMapper ascensionMapper;
+    private final SrLightconeExpUpgradeMapper expUpgradeMapper;
     private final SrItemMapper itemMapper;
-    private final RedisCache redisCache;
-    
+    private final SrUserItemMapper userItemMapper;
+
     private static final Integer MAX_LEVEL = 80;
-    
-    // 缓存相关常量
-    private static final String CULTIVATION_CACHE_PREFIX = "sr:lightcone:cultivation:";
-    private static final String CULTIVATION_LIGHTCONE_KEY = CULTIVATION_CACHE_PREFIX + "lightcone:%d"; // userLightConeId
-    private static final String CULTIVATION_TOTAL_KEY = CULTIVATION_CACHE_PREFIX + "total:%d:%d"; // userId:targetLevel
-    private static final long CACHE_EXPIRE_MINUTES = 30; // 缓存有效期30分钟
-    
+
+    /** 光锥升级经验书物品名（升级表直接存储其数量） */
+    private static final String EXP_BOOK_NAME = "稀薄以太";
+
     // 罗马数字映射
     private static final String[] ROMAN_NUMBERS = {"I", "II", "III", "IV", "V"};
 
@@ -54,31 +60,21 @@ public class SrLightConeCultivationServiceImpl implements ISrLightConeCultivatio
         {
             targetLevel = MAX_LEVEL;
         }
-        
-        // 构建缓存key
-        String cacheKey = String.format(CULTIVATION_LIGHTCONE_KEY, userLightConeId);
-        
-        // 尝试从缓存获取
-        SrLightConeCultivationVO cachedResult = redisCache.getCacheObject(cacheKey);
-        if (cachedResult != null)
-        {
-            return cachedResult;
-        }
-        
+
         SrUserLightCone ulc = userLightConeMapper.selectSrUserLightConeById(userLightConeId);
         if (ulc == null)
         {
             return null;
         }
-        
+
         SrLightCones lightCone = lightConesMapper.selectSrLightConesById(ulc.getLightConeId());
         if (lightCone == null)
         {
             return null;
         }
-        
+
         SrLightConeCultivationVO result = new SrLightConeCultivationVO();
-        
+
         // 光锥信息
         SrLightConeCultivationVO.LightConeInfo info = new SrLightConeCultivationVO.LightConeInfo();
         info.setUserLightConeId(ulc.getId());
@@ -96,23 +92,27 @@ public class SrLightConeCultivationServiceImpl implements ISrLightConeCultivatio
             info.setSuperimpositionRoman(ROMAN_NUMBERS[superimpositionIndex]);
         }
         result.setLightCone(info);
-        
-        // 计算材料需求
-        Map<Long, Long> materialMap = calculateMaterialsForLightCone(ulc, targetLevel);
-        
+
+        Integer starLevel = lightCone.getStarLevel() != null ? lightCone.getStarLevel().intValue() : null;
+        Integer currentLevel = ulc.getLevel() != null ? ulc.getLevel() : 1;
+
+        // 计算材料消耗（晋升材料 + 升级经验书/信用点，按当前等级过滤）
+        List<SrLightconeExpUpgrade> expUpgrades = starLevel != null
+                ? expUpgradeMapper.selectByStarLevel(starLevel) : new ArrayList<>();
+        Map<Long, Long> materialMap = calculateMaterialsForLightCone(
+                ulc.getLightConeId(), currentLevel, targetLevel, expUpgrades, resolveExpBookItemId());
+        log.debug("用户持有id{}的光锥{}材料消耗：{}", ulc.getId(), ulc.getLightConeId(), materialMap);
         // 查询用户背包材料
         Map<Long, Long> userItemMap = getUserItemMap(ulc.getUserId());
-        
+
         // 构建材料需求列表
         List<SrLightConeCultivationVO.MaterialRequirement> materialList = buildMaterialList(materialMap, userItemMap);
         result.setMaterials(materialList);
-        
-        // 判断是否已完成培养
+
+        // 判断是否已完成培养（无材料需求）
         result.setCompleted(materialList.isEmpty());
-        
-        // 缓存计算结果，有效期30分钟
-        redisCache.setCacheObject(cacheKey, result, (int) CACHE_EXPIRE_MINUTES, TimeUnit.MINUTES);
-        
+
+        log.debug("光锥{}养成材料计算结果：{}", ulc.getLightConeId(), result);
         return result;
     }
 
@@ -123,120 +123,198 @@ public class SrLightConeCultivationServiceImpl implements ISrLightConeCultivatio
         {
             targetLevel = MAX_LEVEL;
         }
-        
-        // 构建缓存key
-        String cacheKey = String.format(CULTIVATION_TOTAL_KEY, userId, targetLevel);
-        
-        // 尝试从缓存获取
-        SrLightConeCultivationVO cachedResult = redisCache.getCacheObject(cacheKey);
-        if (cachedResult != null)
-        {
-            return cachedResult;
-        }
-        
+
         SrLightConeCultivationVO result = new SrLightConeCultivationVO();
-        
+
         // 查询用户所有光锥（养成计算不需要过滤条件）
         List<SrUserLightCone> userLightCones = userLightConeMapper.selectByUserIdWithDetails(userId, null, null, null);
-        
-        // 计算总体材料需求
+
+        // 全量升级配置一次性查出，供各光锥按星级过滤（避免逐个光锥查库）
+        List<SrLightconeExpUpgrade> allExpUpgrades = expUpgradeMapper.selectAllOrderByStarAndLevel();
+        Long expItemId = resolveExpBookItemId();
+
+        // 计算总体材料消耗
         Map<Long, Long> totalMaterialMap = new HashMap<>();
-        
         for (SrUserLightCone ulc : userLightCones)
         {
-            Map<Long, Long> lightConeMaterials = calculateMaterialsForLightCone(ulc, targetLevel);
-            for (Map.Entry<Long, Long> entry : lightConeMaterials.entrySet())
-            {
-                totalMaterialMap.merge(entry.getKey(), entry.getValue(), Long::sum);
-            }
+            Integer starLevel = ulc.getStarLevel() != null ? ulc.getStarLevel().intValue() : null;
+            Integer currentLevel = ulc.getLevel() != null ? ulc.getLevel() : 1;
+            Map<Long, Long> lightConeMaterials = calculateMaterialsForLightCone(
+                    ulc.getLightConeId(), currentLevel, targetLevel,
+                    filterExpUpgradesByStar(allExpUpgrades, starLevel), expItemId);
+            lightConeMaterials.forEach((itemId, quantity) -> totalMaterialMap.merge(itemId, quantity, Long::sum));
         }
-        
+
         // 查询用户背包材料
         Map<Long, Long> userItemMap = getUserItemMap(userId);
-        
+
         // 构建材料需求列表
         List<SrLightConeCultivationVO.MaterialRequirement> materialList = buildMaterialList(totalMaterialMap, userItemMap);
         result.setMaterials(materialList);
-        
+
         // 判断是否已完成培养（所有光锥都满级）
         result.setCompleted(materialList.isEmpty());
-        
+
         // 设置总体光锥信息（用于前端展示）
         SrLightConeCultivationVO.LightConeInfo totalInfo = new SrLightConeCultivationVO.LightConeInfo();
         totalInfo.setLightConeName("总体");
         totalInfo.setTargetLevel(targetLevel);
         result.setLightCone(totalInfo);
-        
-        // 缓存计算结果，有效期30分钟
-        redisCache.setCacheObject(cacheKey, result, (int) CACHE_EXPIRE_MINUTES, TimeUnit.MINUTES);
-        
+
+        log.debug("用户{}的光锥养成材料计算结果：{}", userId, result);
         return result;
     }
 
     /**
-     * 计算单个光锥的材料需求
+     * 计算单个光锥的材料消耗（按当前等级过滤）
+     * - 晋升材料：break_level（20/30/40/50/60/70/80）大于当前等级且不超过目标等级的才需要
+     * - 升级经验：升级表直接存储经验书数量，区间覆盖当前等级之后到目标等级的部分才需要
+     *
+     * @param expUpgrades 该光锥星级对应的升级配置
+     * @param expItemId   经验书物品ID，可为 null
      */
-    private Map<Long, Long> calculateMaterialsForLightCone(SrUserLightCone ulc, Integer targetLevel)
+    private Map<Long, Long> calculateMaterialsForLightCone(Long lightConeId, Integer currentLevel, Integer targetLevel,
+                                                           List<SrLightconeExpUpgrade> expUpgrades, Long expItemId)
     {
         Map<Long, Long> materialMap = new HashMap<>();
-        
-        Integer currentLevel = ulc.getLevel() != null ? ulc.getLevel() : 1;
-        
-        // 获取光锥晋升材料配置
-        List<SrLightConeAscension> ascensions = ascensionMapper.selectSrLightConeAscensionByConeId(ulc.getLightConeId());
-        if (ascensions == null || ascensions.isEmpty())
+
+        // 晋升材料
+        List<SrLightConeAscension> ascensions = ascensionMapper.selectSrLightConeAscensionByConeId(lightConeId);
+        if (ascensions != null)
         {
-            return materialMap;
-        }
-        
-        // 遍历所有晋升材料，计算需要的材料
-        for (SrLightConeAscension ascension : ascensions)
-        {
-            Integer breakLevel = ascension.getBreakLevel();
-            
-            // 当前等级 < breakLevel 的材料都需要
-            if (currentLevel < breakLevel && breakLevel <= targetLevel)
+            for (SrLightConeAscension ascension : ascensions)
             {
-                if (ascension.getItemId() != null && ascension.getQuantity() != null)
+                Integer breakLevel = ascension.getBreakLevel();
+                if (breakLevel == null || ascension.getItemId() == null || ascension.getQuantity() == null)
+                {
+                    continue;
+                }
+                // 光锥突破：0-20级为第一次突破，之后每10级一次，共6次（20/30/40/50/60/70），80级不再突破
+                // 突破等级 >= 当前等级 且 未超过目标等级 时需要（80级无突破）
+                if (breakLevel >= currentLevel && breakLevel <= targetLevel && breakLevel < MAX_LEVEL)
                 {
                     materialMap.merge(ascension.getItemId(), ascension.getQuantity().longValue(), Long::sum);
                 }
             }
         }
-        
+
+        // 升级经验书 + 信用点
+        calculateExpMaterials(currentLevel, targetLevel, expUpgrades, expItemId, materialMap);
+
         return materialMap;
     }
 
     /**
-     * 获取用户背包材料
+     * 计算升级经验书与信用点消耗
+     * 升级表直接存储经验书（稀薄以太）数量，无需换算
+     */
+    private void calculateExpMaterials(Integer currentLevel, Integer targetLevel,
+                                       List<SrLightconeExpUpgrade> expUpgrades, Long expItemId,
+                                       Map<Long, Long> materialMap)
+    {
+        // 目标等级与当前等级相同，不需要升级经验和信用点
+        if (expUpgrades == null || expUpgrades.isEmpty() || currentLevel == null
+                || currentLevel.equals(targetLevel))
+        {
+            return;
+        }
+
+        for (SrLightconeExpUpgrade upgrade : expUpgrades)
+        {
+            // 只计算当前等级之后需要的经验
+            if (upgrade.getMinLevel() == null || upgrade.getMaxLevel() == null
+                    || upgrade.getMinLevel() < currentLevel || upgrade.getMaxLevel() > targetLevel)
+            {
+                continue;
+            }
+            if (expItemId != null && upgrade.getExpRequired() != null)
+            {
+                materialMap.merge(expItemId, upgrade.getExpRequired(), Long::sum);
+            }
+            if (upgrade.getCreditsRequired() != null)
+            {
+                materialMap.merge(CommonItemEnum.CREDIT.getItemId(), upgrade.getCreditsRequired(), Long::sum);
+            }
+        }
+    }
+
+    /**
+     * 按星级过滤升级配置
+     */
+    private List<SrLightconeExpUpgrade> filterExpUpgradesByStar(List<SrLightconeExpUpgrade> all, Integer starLevel)
+    {
+        List<SrLightconeExpUpgrade> result = new ArrayList<>();
+        if (all == null || starLevel == null)
+        {
+            return result;
+        }
+        for (SrLightconeExpUpgrade upgrade : all)
+        {
+            if (starLevel.equals(upgrade.getStarLevel()))
+            {
+                result.add(upgrade);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 解析光锥升级经验书（稀薄以太）物品ID
+     */
+    private Long resolveExpBookItemId()
+    {
+        SrItem item = itemMapper.selectSrItemByName(EXP_BOOK_NAME);
+        return item != null ? item.getId() : null;
+    }
+
+    /**
+     * 获取用户背包材料数量映射
      */
     private Map<Long, Long> getUserItemMap(Long userId)
     {
         Map<Long, Long> userItemMap = new HashMap<>();
-        // 这里需要查询用户背包材料，暂时返回空Map
-        // 实际实现需要查询 sr_user_item 表
+        SrUserItem query = new SrUserItem();
+        query.setUserId(userId);
+        List<SrUserItem> items = userItemMapper.selectSrUserItemList(query);
+        for (SrUserItem item : items)
+        {
+            if (item.getItemId() != null && item.getQuantity() != null)
+            {
+                userItemMap.put(item.getItemId(), item.getQuantity());
+            }
+        }
         return userItemMap;
     }
 
     /**
      * 构建材料需求列表
+     * - requiredQuantity（消耗）：按当前等级进度过滤后的材料消耗
+     * - difference（差额）：消耗 - 用户持有数量，不足为0
      */
-    private List<SrLightConeCultivationVO.MaterialRequirement> buildMaterialList(Map<Long, Long> materialMap, Map<Long, Long> userItemMap)
+    private List<SrLightConeCultivationVO.MaterialRequirement> buildMaterialList(Map<Long, Long> materialMap,
+                                                                                 Map<Long, Long> userItemMap)
     {
         List<SrLightConeCultivationVO.MaterialRequirement> materialList = new ArrayList<>();
-        
+        if (materialMap == null || materialMap.isEmpty())
+        {
+            return materialList;
+        }
+
+        // 收集 itemId 后一次性批量查询，避免逐条查库
+        Map<Long, SrItem> itemMap = selectItemsByIds(materialMap.keySet());
+
         for (Map.Entry<Long, Long> entry : materialMap.entrySet())
         {
             Long itemId = entry.getKey();
-            Long requiredQuantity = entry.getValue();
-            Long ownedQuantity = userItemMap.getOrDefault(itemId, 0L);
-            
-            SrItem item = itemMapper.selectSrItemById(itemId);
+            SrItem item = itemMap.get(itemId);
             if (item == null)
             {
                 continue;
             }
-            
+
+            long requiredQuantity = entry.getValue();
+            long ownedQuantity = userItemMap.getOrDefault(itemId, 0L);
+
             SrLightConeCultivationVO.MaterialRequirement requirement = new SrLightConeCultivationVO.MaterialRequirement();
             requirement.setItemId(itemId);
             requirement.setItemName(item.getItemName());
@@ -244,11 +322,39 @@ public class SrLightConeCultivationServiceImpl implements ISrLightConeCultivatio
             requirement.setRarityLevel(item.getStarLevel() != null ? item.getStarLevel().intValue() : 2);
             requirement.setRequiredQuantity(requiredQuantity);
             requirement.setOwnedQuantity(ownedQuantity);
-            requirement.setDifference(requiredQuantity - ownedQuantity);
-            
+            // 差额 = 材料消耗 - 用户持有数量，不足为0
+            requirement.setDifference(Math.max(requiredQuantity - ownedQuantity, 0L));
+            // 材料类型排序优先级（内部使用，不返回前端）
+            requirement.setSortOrder(MaterialSortEnum.resolveOrder(item));
+
             materialList.add(requirement);
         }
-        
+
+        // 按材料类型优先级（信用点/经验书/TOD/EOW/SS/TRA/CAL）、星级从高到低、itemId 稳定排序
+        materialList.sort(Comparator
+                .comparingInt(SrLightConeCultivationVO.MaterialRequirement::getSortOrder)
+                .thenComparing(SrLightConeCultivationVO.MaterialRequirement::getRarityLevel,
+                        Comparator.nullsLast(Comparator.<Integer>reverseOrder()))
+                .thenComparing(SrLightConeCultivationVO.MaterialRequirement::getItemId));
+
         return materialList;
+    }
+
+    /**
+     * 按 itemId 集合批量查询材料，返回 itemId -> SrItem 映射
+     */
+    private Map<Long, SrItem> selectItemsByIds(Set<Long> itemIds)
+    {
+        Map<Long, SrItem> itemMap = new HashMap<>();
+        if (itemIds == null || itemIds.isEmpty())
+        {
+            return itemMap;
+        }
+        List<SrItem> items = itemMapper.selectSrItemByIds(new ArrayList<>(itemIds));
+        for (SrItem item : items)
+        {
+            itemMap.put(item.getId(), item);
+        }
+        return itemMap;
     }
 }

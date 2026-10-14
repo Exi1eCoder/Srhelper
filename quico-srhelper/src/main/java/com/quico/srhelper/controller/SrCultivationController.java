@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * 养成计算控制器
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/srhelper/cultivation")
 @Tag(name = "养成计算", description = "角色养成材料计算")
 @RequiredArgsConstructor
+@Slf4j
 public class SrCultivationController {
     
     private final ISrCultivationService cultivationService;
@@ -42,8 +44,11 @@ public class SrCultivationController {
     @GetMapping("/characters")
     public AjaxResult calculateCharacters(
             @Parameter(description = "目标等级，默认80") @RequestParam(required = false) Integer targetLevel) {
+        long startTime = System.currentTimeMillis();
+        log.debug("接口开始时间：{}", startTime);
         Long userId = SecurityUtils.getUserId();
         SrCharactersCultivationVO result = cultivationService.calculateUserCharactersCultivation(userId, targetLevel);
+        log.debug("接口结束时间：{}，耗时：{}", System.currentTimeMillis(), System.currentTimeMillis() - startTime);
         return AjaxResult.success(result);
     }
     

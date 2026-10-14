@@ -1,5 +1,6 @@
 package com.quico.srhelper.domain.vo;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 import java.util.List;
 
@@ -79,7 +80,11 @@ public class SrLightConeCultivationVO
         /** 背包数量 */
         private Long ownedQuantity;
 
-        /** 差额（正数表示缺少，负数表示多余） */
+        /** 差额（不足为0） */
         private Long difference;
+
+        /** 材料类型排序优先级（内部排序使用，不返回前端） */
+        @JsonIgnore
+        private Integer sortOrder;
     }
 }

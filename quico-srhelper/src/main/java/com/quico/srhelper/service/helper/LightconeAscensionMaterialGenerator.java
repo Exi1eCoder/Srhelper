@@ -72,12 +72,16 @@ public class LightconeAscensionMaterialGenerator {
                         lightCone.getLightConeName(), tpl.getItemId(), templateType, tpl.getBreakLevel());
                 continue;
             }
-            int rarity = itemRarityMap.getOrDefault(realItemId, 2);
+            Integer rarity = itemRarityMap.getOrDefault(realItemId, 2);
+
+            // 模板 breakLevel 为突破阶段(1-6)，入库 break_level 需转换为对应等级：1→20, 2→30, ..., 6→70
+            Integer phase = tpl.getBreakLevel() != null ? tpl.getBreakLevel().intValue() : null;
+            int breakLevel = phase != null ? (phase + 1) * 10 : 0;
 
             SrLightConeAscension material = SrLightConeAscension.builder()
                     .lightConeId(lightConeId)
-                    .ascensionPhase(tpl.getBreakLevel() != null ? tpl.getBreakLevel().intValue() : 0)
-                    .breakLevel(tpl.getBreakLevel() != null ? tpl.getBreakLevel().intValue() : 0)
+                    .ascensionPhase(phase != null ? phase : 0)
+                    .breakLevel(breakLevel)
                     .materialSlot(tpl.getMaterialSlot() != null ? tpl.getMaterialSlot().intValue() : 1)
                     .itemId(realItemId)
                     .rarityLevel(rarity)

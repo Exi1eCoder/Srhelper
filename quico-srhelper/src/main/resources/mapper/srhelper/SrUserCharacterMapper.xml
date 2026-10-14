@@ -14,6 +14,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="skillLevel"    column="skill_level"    />
         <result property="ultimateLevel"    column="ultimate_level"    />
         <result property="talentLevel"    column="talent_level"    />
+        <result property="memospriteskillLevel"    column="memospriteskill_level"    />
+        <result property="memospritetalentLevel"    column="memospritetalent_level"    />
+        <result property="elationskillLevel"    column="elationskill_level"    />
         <result property="bonusAbility1"    column="bonus_ability_1"    />
         <result property="bonusAbility2"    column="bonus_ability_2"    />
         <result property="bonusAbility3"    column="bonus_ability_3"    />
@@ -35,7 +38,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectSrUserCharacterVo">
-        select id, user_id, character_id, level, eidolon, basic_atk_level, skill_level, ultimate_level, talent_level, bonus_ability_1, bonus_ability_2, bonus_ability_3, stat_bonus_1, stat_bonus_2, stat_bonus_3, stat_bonus_4, stat_bonus_5, stat_bonus_6, stat_bonus_7, stat_bonus_8, stat_bonus_9, stat_bonus_10, create_by, create_time, update_by, update_time, remark from sr_user_character
+        select id, user_id, character_id, level, eidolon, basic_atk_level, skill_level, ultimate_level, talent_level, memospriteskill_level, memospritetalent_level, elationskill_level, bonus_ability_1, bonus_ability_2, bonus_ability_3, stat_bonus_1, stat_bonus_2, stat_bonus_3, stat_bonus_4, stat_bonus_5, stat_bonus_6, stat_bonus_7, stat_bonus_8, stat_bonus_9, stat_bonus_10, create_by, create_time, update_by, update_time, remark from sr_user_character
     </sql>
 
     <select id="selectSrUserCharacterList" parameterType="SrUserCharacter" resultMap="SrUserCharacterResult">
@@ -44,6 +47,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="userId != null "> and user_id = #{userId}</if>
             <if test="characterId != null "> and character_id = #{characterId}</if>
         </where>
+        order by character_id desc
     </select>
     
     <select id="selectSrUserCharacterById" parameterType="Long" resultMap="SrUserCharacterResult">
@@ -62,6 +66,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="skillLevel != null">skill_level,</if>
             <if test="ultimateLevel != null">ultimate_level,</if>
             <if test="talentLevel != null">talent_level,</if>
+            <if test="memospriteskillLevel != null">memospriteskill_level,</if>
+            <if test="memospritetalentLevel != null">memospritetalent_level,</if>
+            <if test="elationskillLevel != null">elationskill_level,</if>
             <if test="bonusAbility1 != null">bonus_ability_1,</if>
             <if test="bonusAbility2 != null">bonus_ability_2,</if>
             <if test="bonusAbility3 != null">bonus_ability_3,</if>
@@ -90,6 +97,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="skillLevel != null">#{skillLevel},</if>
             <if test="ultimateLevel != null">#{ultimateLevel},</if>
             <if test="talentLevel != null">#{talentLevel},</if>
+            <if test="memospriteskillLevel != null">#{memospriteskillLevel},</if>
+            <if test="memospritetalentLevel != null">#{memospritetalentLevel},</if>
+            <if test="elationskillLevel != null">#{elationskillLevel},</if>
             <if test="bonusAbility1 != null">#{bonusAbility1},</if>
             <if test="bonusAbility2 != null">#{bonusAbility2},</if>
             <if test="bonusAbility3 != null">#{bonusAbility3},</if>
@@ -122,6 +132,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="skillLevel != null">skill_level = #{skillLevel},</if>
             <if test="ultimateLevel != null">ultimate_level = #{ultimateLevel},</if>
             <if test="talentLevel != null">talent_level = #{talentLevel},</if>
+            <if test="memospriteskillLevel != null">memospriteskill_level = #{memospriteskillLevel},</if>
+            <if test="memospritetalentLevel != null">memospritetalent_level = #{memospritetalentLevel},</if>
+            <if test="elationskillLevel != null">elationskill_level = #{elationskillLevel},</if>
             <if test="bonusAbility1 != null">bonus_ability_1 = #{bonusAbility1},</if>
             <if test="bonusAbility2 != null">bonus_ability_2 = #{bonusAbility2},</if>
             <if test="bonusAbility3 != null">bonus_ability_3 = #{bonusAbility3},</if>

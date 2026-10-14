@@ -21,6 +21,14 @@ public interface SrItemMapper
     public SrItem selectSrItemById(Long id);
 
     /**
+     * 按主键集合批量查询材料一览
+     *
+     * @param ids 材料一览主键集合
+     * @return 材料一览集合
+     */
+    public List<SrItem> selectSrItemByIds(@Param("ids") List<Long> ids);
+
+    /**
      * 按物品名字精确查询（导入去重用）
      *
      * @param itemName 物品名字

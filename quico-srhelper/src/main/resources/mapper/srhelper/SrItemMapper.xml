@@ -48,6 +48,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where id = #{id}
     </select>
 
+    <select id="selectSrItemByIds" resultMap="SrItemResult">
+        <include refid="selectSrItemVo"/>
+        where id in
+        <foreach item="id" collection="ids" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
     <select id="selectSrItemByName" resultMap="SrItemResult">
         <include refid="selectSrItemVo"/>
         where item_name = #{itemName}

@@ -1,5 +1,6 @@
 package com.quico.srhelper.domain.vo;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 
 import java.util.List;
@@ -39,5 +40,8 @@ public class SrCharacterCultivationVO {
         private Long requiredQuantity;
         private Long ownedQuantity;
         private Long difference;
+        /** 材料类型排序优先级（内部排序使用，不返回前端） */
+        @JsonIgnore
+        private Integer sortOrder;
     }
 }

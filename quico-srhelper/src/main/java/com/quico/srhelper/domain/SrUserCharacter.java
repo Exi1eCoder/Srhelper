@@ -55,6 +55,18 @@ public class SrUserCharacter extends BaseEntity
     @Excel(name = "天赋等级(1-10)")
     private Long talentLevel;
 
+    /** 忆灵技能(1-6)，记忆命途特有，其他命途恒为默认值1 */
+    @Excel(name = "忆灵技能(1-6)")
+    private Long memospriteskillLevel;
+
+    /** 忆灵天赋(1-6)，记忆命途特有，其他命途恒为默认值1 */
+    @Excel(name = "忆灵天赋(1-6)")
+    private Long memospritetalentLevel;
+
+    /** 欢愉技(1-10)，欢愉命途特有，其他命途恒为默认值1 */
+    @Excel(name = "欢愉技(1-10)")
+    private Long elationskillLevel;
+
     /** 额外能力1 */
     @Excel(name = "额外能力1")
     private Long bonusAbility1;

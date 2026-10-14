@@ -1,7 +1,7 @@
 package com.quico.srhelper.service.impl;
 
 import com.quico.srhelper.domain.enums.AscensionTypeEnum;
-import com.quico.srhelper.domain.enums.CommonItemEnum;
+import com.quico.srhelper.domain.enums.CharacterPathEnum;
 import com.quico.srhelper.domain.enums.MaterialSortEnum;
 import com.quico.srhelper.domain.SrCharacter;
 import com.quico.srhelper.domain.SrCharacterAscensionMaterial;
@@ -34,6 +34,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 养成计算Service实现类
@@ -56,7 +57,6 @@ public class SrCultivationServiceImpl implements ISrCultivationService {
     private static final Integer MAX_SKILL_LEVEL = 10;
     private static final Integer MAX_BASIC_ATK_LEVEL = 6;
     private static final Long EXP_PER_BOOK = 1000L; // 每本旅行见闻提供的经验值
-    private static final String ITEM_NAME_EXP_BOOK = "旅行见闻"; // 经验书物品名（sr_item.ascension_type 为空，按名称识别）
     
     @Override
     public SrCultivationCalcVO calculateTotalCultivation(Long userId, Integer targetLevel) {
@@ -164,7 +164,7 @@ public class SrCultivationServiceImpl implements ISrCultivationService {
             SrCharacter character = characterMapper.selectSrCharacterById(uc.getCharacterId());
             if (character == null) continue;
             
-            results.add(new CharacterMaterials(uc, character, calculateAllMaterialsForCharacter(uc, targetLevel)));
+            results.add(new CharacterMaterials(uc, character, calculateAllMaterialsForCharacter(uc, character, targetLevel)));
         }
         
         return results;
@@ -226,7 +226,7 @@ public class SrCultivationServiceImpl implements ISrCultivationService {
         result.setCharacter(info);
         
         // 计算材料消耗（按持有角色进度过滤）
-        MaterialCalc calc = calculateAllMaterialsForCharacter(uc, targetLevel);
+        MaterialCalc calc = calculateAllMaterialsForCharacter(uc, character, targetLevel);
         log.debug("计算角色{}的材料消耗，当前等级：{}，目标等级：{}，消耗={}",
                 uc.getCharacterId(), uc.getLevel(), targetLevel, calc.materials);
         info.setIsMaxLevel(calc.completed);
@@ -248,11 +248,11 @@ public class SrCultivationServiceImpl implements ISrCultivationService {
      * - 未完成培养：按 sr_user_character 的进度过滤出实际需要的材料消耗（前端"消耗"列），
      *   差额 = 消耗 - 用户持有(sr_user_item)
      */
-    private MaterialCalc calculateAllMaterialsForCharacter(SrUserCharacter uc, Integer targetLevel) {
+    private MaterialCalc calculateAllMaterialsForCharacter(SrUserCharacter uc, SrCharacter character, Integer targetLevel) {
         MaterialCalc calc = new MaterialCalc();
         
         // 已完成培养的角色直接返回，不需要查表等材料计算
-        if (isCultivationCompleted(uc)) {
+        if (isCultivationCompleted(uc, character)) {
             calc.completed = true;
             return calc;
         }
@@ -274,7 +274,7 @@ public class SrCultivationServiceImpl implements ISrCultivationService {
             if (material.getItemId() == null || material.getQuantity() == null) {
                 continue;
             }
-            if (isMaterialNeeded(uc, material)) {
+            if (isMaterialNeeded(uc, character, material)) {
                 calc.materials.merge(material.getItemId(), material.getQuantity().longValue(), Long::sum);
             }
         }
@@ -288,9 +288,10 @@ public class SrCultivationServiceImpl implements ISrCultivationService {
     /**
      * 判断角色是否已完成培养
      * 等级满级 + 普攻满级 + 战技/终结技/天赋满级 + 额外能力1~3全为1 + 额外属性1~10全为1
+     * 命途特有维度：记忆命途还需忆灵技能/忆灵天赋满级，欢愉命途还需欢愉技满级
      */
-    private boolean isCultivationCompleted(SrUserCharacter uc) {
-        return isReachMax(uc.getLevel(), MAX_LEVEL)
+    private boolean isCultivationCompleted(SrUserCharacter uc, SrCharacter character) {
+        boolean baseCompleted = isReachMax(uc.getLevel(), MAX_LEVEL)
                 && isReachMax(uc.getBasicAtkLevel(), MAX_BASIC_ATK_LEVEL)
                 && isReachMax(uc.getSkillLevel(), MAX_SKILL_LEVEL)
                 && isReachMax(uc.getUltimateLevel(), MAX_SKILL_LEVEL)
@@ -308,6 +309,21 @@ public class SrCultivationServiceImpl implements ISrCultivationService {
                 && isUnlocked(uc.getStatBonus8())
                 && isUnlocked(uc.getStatBonus9())
                 && isUnlocked(uc.getStatBonus10());
+        if (!baseCompleted) {
+            return false;
+        }
+        
+        // 命途特有维度
+        CharacterPathEnum path = CharacterPathEnum.fromPath(character != null ? character.getPath() : null);
+        if (path.hasMemosprite()
+                && (!isReachMax(uc.getMemospriteskillLevel(), path.getMaxMemospriteskillLevel())
+                    || !isReachMax(uc.getMemospritetalentLevel(), path.getMaxMemospritetalentLevel()))) {
+            return false;
+        }
+        if (path.hasElationSkill() && !isReachMax(uc.getElationskillLevel(), path.getMaxElationskillLevel())) {
+            return false;
+        }
+        return true;
     }
     
     /**
@@ -328,12 +344,14 @@ public class SrCultivationServiceImpl implements ISrCultivationService {
      * 判断某条材料是否仍需要消耗（依据 sr_user_character 的当前进度）
      * 未满级/未点亮的部分计入消耗，已完成的维度不参与计算
      */
-    private boolean isMaterialNeeded(SrUserCharacter uc, SrCharacterAscensionMaterial material) {
+    private boolean isMaterialNeeded(SrUserCharacter uc, SrCharacter character, SrCharacterAscensionMaterial material) {
         String ascensionType = material.getAscensionType();
         Integer breakLevel = material.getBreakLevel();
         if (ascensionType == null || breakLevel == null) {
             return true;
         }
+        
+        CharacterPathEnum path = CharacterPathEnum.fromPath(character != null ? character.getPath() : null);
         
         switch (ascensionType.toLowerCase()) {
             // 等级突破：共6次，1阶对应20级上限，6阶对应70级（70级为最后一次突破）
@@ -367,8 +385,30 @@ public class SrCultivationServiceImpl implements ISrCultivationService {
             // 额外属性：break_level 1~10 对应 stat_bonus_1~10，表中为1表示已完成培养，不参与材料计算
             case "statbonus":
                 return getStatBonus(uc, breakLevel) == 0;
+            // 忆灵技能/忆灵天赋：记忆命途特有维度，非记忆命途不参与计算（默认1到1消耗为0）
+            case "memospriteskill": {
+                if (!path.hasMemosprite()) {
+                    return false;
+                }
+                int currentLevel = uc.getMemospriteskillLevel() != null ? uc.getMemospriteskillLevel().intValue() : 1;
+                return breakLevel > currentLevel;
+            }
+            case "memospritetalent": {
+                if (!path.hasMemosprite()) {
+                    return false;
+                }
+                int currentLevel = uc.getMemospritetalentLevel() != null ? uc.getMemospritetalentLevel().intValue() : 1;
+                return breakLevel > currentLevel;
+            }
+            // 欢愉技：欢愉命途特有维度，非欢愉命途不参与计算（默认1到1消耗为0）
+            case "elationskill": {
+                if (!path.hasElationSkill()) {
+                    return false;
+                }
+                int currentLevel = uc.getElationskillLevel() != null ? uc.getElationskillLevel().intValue() : 1;
+                return breakLevel > currentLevel;
+            }
             // TODO 秘技：sr_user_character 表暂无秘技等级字段，暂按未培养处理（全部计入消耗）
-            // TODO 记忆命途(忆灵技/忆灵天赋)、欢愉命途(欢愉技)：sr_user_character 表未建对应字段，暂按未培养处理（全部计入消耗）
             default:
                 return true;
         }
@@ -823,13 +863,17 @@ public class SrCultivationServiceImpl implements ISrCultivationService {
     private List<SrCharacterCultivationVO.MaterialRequirement> buildMaterialList(Map<Long, Long> materialMap,
                                                                                 Map<Long, Long> userItemMap) {
         List<SrCharacterCultivationVO.MaterialRequirement> list = new ArrayList<>();
-        // itemId -> 材料类型排序优先级（内部使用，不返回前端）
-        Map<Long, Integer> orderMap = new HashMap<>();
+        if (materialMap == null || materialMap.isEmpty()) {
+            return list;
+        }
         
         log.debug("构建材料需求列表，材料消耗={}，用户持有材料={}", materialMap, userItemMap);
         
+        // 收集 itemId 后一次性批量查询，避免逐条查库
+        Map<Long, SrItem> itemMap = selectItemsByIds(materialMap.keySet());
+        
         for (Map.Entry<Long, Long> entry : materialMap.entrySet()) {
-            SrItem item = itemMapper.selectSrItemById(entry.getKey());
+            SrItem item = itemMap.get(entry.getKey());
             if (item == null) continue;
             
             long required = entry.getValue();
@@ -845,17 +889,17 @@ public class SrCultivationServiceImpl implements ISrCultivationService {
             req.setRequiredQuantity(required);
             req.setOwnedQuantity(owned);
             req.setDifference(difference);
+            // 材料类型排序优先级（内部使用，不返回前端）
+            req.setSortOrder(MaterialSortEnum.resolveOrder(item));
             log.debug("材料[{}]{}：消耗={}，持有={}，差额={}", req.getItemId(), req.getItemName(),
                     req.getRequiredQuantity(), req.getOwnedQuantity(), req.getDifference());
             
-            orderMap.put(item.getId(), resolveMaterialOrder(item));
             list.add(req);
         }
         
         // 按材料类型优先级（信用点/旅行见闻/TOD/EOW/SS/TRA/CAL）、星级从高到低、itemId 稳定排序
         list.sort(Comparator
-                .comparingInt((SrCharacterCultivationVO.MaterialRequirement r) ->
-                        orderMap.getOrDefault(r.getItemId(), MaterialSortEnum.UNKNOWN.getOrder()))
+                .comparingInt(SrCharacterCultivationVO.MaterialRequirement::getSortOrder)
                 .thenComparing(SrCharacterCultivationVO.MaterialRequirement::getRarityLevel,
                         Comparator.nullsLast(Comparator.<Integer>reverseOrder()))
                 .thenComparing(SrCharacterCultivationVO.MaterialRequirement::getItemId));
@@ -864,18 +908,18 @@ public class SrCultivationServiceImpl implements ISrCultivationService {
     }
     
     /**
-     * 解析材料的类型排序优先级
-     * 信用点、旅行见闻的 sr_item.ascension_type 为空，按物品单独识别；其余按 ascension_type 字典值
+     * 按 itemId 集合批量查询材料，返回 itemId -> SrItem 映射
      */
-    private int resolveMaterialOrder(SrItem item) {
-        if (CommonItemEnum.CREDIT.getItemId().equals(item.getId())) {
-            return MaterialSortEnum.CREDIT.getOrder();
+    private Map<Long, SrItem> selectItemsByIds(Set<Long> itemIds) {
+        Map<Long, SrItem> itemMap = new HashMap<>();
+        if (itemIds == null || itemIds.isEmpty()) {
+            return itemMap;
         }
-        if (ITEM_NAME_EXP_BOOK.equals(item.getItemName())) {
-            return MaterialSortEnum.EXP_BOOK.getOrder();
+        List<SrItem> items = itemMapper.selectSrItemByIds(new ArrayList<>(itemIds));
+        for (SrItem item : items) {
+            itemMap.put(item.getId(), item);
         }
-        MaterialSortEnum type = MaterialSortEnum.fromCode(item.getAscensionType());
-        return type != null ? type.getOrder() : MaterialSortEnum.UNKNOWN.getOrder();
+        return itemMap;
     }
     
     /**
