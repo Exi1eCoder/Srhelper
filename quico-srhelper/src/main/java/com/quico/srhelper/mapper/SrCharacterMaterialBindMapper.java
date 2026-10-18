@@ -110,4 +110,11 @@ public interface SrCharacterMaterialBindMapper
      * @return 需要同步的记录列表
      */
     public List<SrCharacterMaterialBind> selectAllForSync();
+
+    /**
+     * 查询材料绑定完整的角色ID集合（绑定行数 = 8）
+     * 
+     * @return 材料绑定完整的角色ID集合
+     */
+    public List<Long> selectUsableCharacterIds();
 }

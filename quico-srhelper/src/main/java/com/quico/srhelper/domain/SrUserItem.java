@@ -35,5 +35,7 @@ public class SrUserItem extends BaseEntity
     @Excel(name = "拥有数量")
     private Long quantity;
 
+    /** 对应材料高阶素材绑定是否完整（可用性标记），查询时关联推导，不持久化 */
+    private Boolean usable;
 
 }

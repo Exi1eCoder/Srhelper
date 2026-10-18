@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import com.quico.common.annotation.Log;
@@ -23,8 +24,10 @@ import com.quico.common.utils.SecurityUtils;
 import com.quico.srhelper.domain.SrLightCones;
 import com.quico.srhelper.domain.dto.LightConeSaveDTO;
 import com.quico.srhelper.service.ISrLightConesService;
+import com.quico.srhelper.service.helper.UsableChecker;
 import com.quico.common.utils.poi.ExcelUtil;
 import com.quico.common.core.page.TableDataInfo;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * 光锥一览Controller
@@ -35,6 +38,7 @@ import com.quico.common.core.page.TableDataInfo;
 @Tag(name = "光锥一览Controller", description = "光锥一览相关接口")
 @RestController
 @RequestMapping("/srhelper/lightcones")
+@Slf4j
 public class SrLightConesController extends BaseController
 {
     @Autowired
@@ -42,13 +46,18 @@ public class SrLightConesController extends BaseController
 
     /**
      * 查询光锥一览列表
+     * onlyUsable 不传或 false，返回全量
+     * onlyUsable=true，仅保留材料绑定完整的数据
      */
     @Operation(summary = "查询光锥一览列表", description = "分页查询光锥一览信息")
     @PreAuthorize("@ss.hasPermi('srhelper:lightcones:list')")
     @GetMapping("/list")
-    public TableDataInfo list(SrLightCones srLightCones)
+    public TableDataInfo list(SrLightCones srLightCones, @RequestParam(defaultValue = "true") Boolean onlyUsable)
     {
+        log.info("查询光锥一览列表，onlyUsable={}", onlyUsable);
         List<SrLightCones> list = srLightConesService.selectSrLightConesList(srLightCones);
+        // onlyUsable=false 时原样返回 onlyUsable=true 时仅返回材料绑定完整的光锥（选择页/我的光锥用）/
+        list = UsableChecker.filterUsable(list, onlyUsable, SrLightCones::getUsable);
         return getDataTable(list);
     }
 

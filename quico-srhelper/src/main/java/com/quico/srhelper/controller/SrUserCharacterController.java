@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.quico.common.annotation.Log;
 import com.quico.common.core.controller.BaseController;
@@ -20,6 +21,7 @@ import com.quico.common.core.domain.AjaxResult;
 import com.quico.common.enums.BusinessType;
 import com.quico.srhelper.domain.SrUserCharacter;
 import com.quico.srhelper.service.ISrUserCharacterService;
+import com.quico.srhelper.service.helper.UsableChecker;
 import com.quico.common.utils.poi.ExcelUtil;
 import com.quico.common.core.page.TableDataInfo;
 
@@ -39,6 +41,8 @@ public class SrUserCharacterController extends BaseController
 
     /**
      * 查询我的角色列表
+     * onlyUsable 不传或 false，返回全量
+     * onlyUsable=true，仅保留材料绑定完整的数据
      */
     @Operation(summary = "查询我的角色列表", description = "分页查询我的角色信息")
     @PreAuthorize("@ss.hasPermi('srhelper:userCharacter:list')")
@@ -47,6 +51,8 @@ public class SrUserCharacterController extends BaseController
     {
         // startPage();
         List<SrUserCharacter> list = srUserCharacterService.selectSrUserCharacterList(srUserCharacter);
+        // onlyUsable=false 时原样返回 onlyUsable=true 时仅返回图鉴材料绑定完整的角色（我的角色页用）
+        list = UsableChecker.filterUsable(list, true, SrUserCharacter::getUsable);
         return getDataTable(list);
     }
 

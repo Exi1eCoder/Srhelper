@@ -78,6 +78,11 @@ public class HttpStatus
     public static final int UNSUPPORTED_TYPE = 415;
 
     /**
+     * 业务规则校验失败（如超出上限）
+     */
+    public static final int UNPROCESSABLE_ENTITY = 422;
+
+    /**
      * 系统内部错误
      */
     public static final int ERROR = 500;

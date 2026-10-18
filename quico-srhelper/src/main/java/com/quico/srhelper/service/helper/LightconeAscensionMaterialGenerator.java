@@ -103,6 +103,18 @@ public class LightconeAscensionMaterialGenerator {
         return materials.size();
     }
 
+    /**
+     * 清空指定光锥的晋升材料
+     * 绑定被清空时同步清理，避免残留半截/过期的晋升材料，保证绑定表与晋升材料表状态一致
+     *
+     * @param lightConeId 光锥ID
+     * @return 删除行数
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public int clearByLightConeId(Long lightConeId) {
+        return ascensionMapper.deleteSrLightConeAscensionByConeId(lightConeId);
+    }
+
     // ======================== 占位符解析（与角色共用相同逻辑） ========================
 
     private Map<String, Long> buildPlaceholderMap(Long lightConeId) {

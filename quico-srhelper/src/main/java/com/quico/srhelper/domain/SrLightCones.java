@@ -54,4 +54,7 @@ public class SrLightCones extends BaseEntity
 //    /** 排序值（新增时自动设时间戳，值越大越靠前） */
 //    @Excel(name = "排序值")
     private Long sortOrder;
+
+    /** 材料绑定是否完整（可用性标记），由图鉴缓存/列表接口动态推导，不持久化到 sr_lightcone */
+    private Boolean usable;
 }

@@ -3,6 +3,7 @@ package com.quico.framework.web.exception;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.BindException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
@@ -14,6 +15,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import com.quico.common.constant.HttpStatus;
 import com.quico.common.core.domain.AjaxResult;
 import com.quico.common.core.text.Convert;
+import com.quico.common.exception.BusinessException;
 import com.quico.common.exception.DemoModeException;
 import com.quico.common.exception.ServiceException;
 import com.quico.common.utils.StringUtils;
@@ -61,6 +63,20 @@ public class GlobalExceptionHandler
         log.error(e.getMessage(), e);
         Integer code = e.getCode();
         return StringUtils.isNotNull(code) ? AjaxResult.error(code, e.getMessage()) : AjaxResult.error(e.getMessage());
+    }
+
+    /**
+     * 业务校验异常
+     *
+     * 按异常携带的状态码返回（400 入参/格式，422 业务规则/上限），body 保持 AjaxResult，
+     * code 与 HTTP 状态码一致，方便前端精确拦截和回滚。
+     */
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<AjaxResult> handleBusinessException(BusinessException e, HttpServletRequest request)
+    {
+        log.warn("请求地址'{}',业务校验失败'{}'", request.getRequestURI(), e.getMessage());
+        Integer code = e.getCode();
+        return ResponseEntity.status(code).body(AjaxResult.error(code, e.getMessage()));
     }
 
     /**

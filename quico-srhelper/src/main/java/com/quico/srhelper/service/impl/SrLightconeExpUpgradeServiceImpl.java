@@ -28,19 +28,29 @@ public class SrLightconeExpUpgradeServiceImpl implements ISrLightconeExpUpgradeS
     private final SrItemMapper srItemMapper;
     private final SrLightconeAscensionTemplateMapper ascensionTemplateMapper;
 
+    /** 光锥升级经验书物品名 */
+    private static final String EXP_ITEM_NAME = "稀薄以太";
+    /** 信用点物品名 */
+    private static final String CREDITS_ITEM_NAME = "信用点";
+
     @Override
     public List<SrLightconeExpUpgradeVO> selectAllExpUpgrades() {
+        // 经验书/信用点物品固定，整表转换前只解析一次，避免逐行重复查库
+        SrItem expItem = srItemMapper.selectSrItemByName(EXP_ITEM_NAME);
+        SrItem creditsItem = srItemMapper.selectSrItemByName(CREDITS_ITEM_NAME);
         return expUpgradeMapper.selectAllOrderByStarAndLevel()
                 .stream()
-                .map(this::convertToVO)
+                .map(entity -> convertToVO(entity, expItem, creditsItem))
                 .collect(Collectors.toList());
     }
 
     @Override
     public List<SrLightconeExpUpgradeVO> selectExpUpgradesByStarLevel(Integer starLevel) {
+        SrItem expItem = srItemMapper.selectSrItemByName(EXP_ITEM_NAME);
+        SrItem creditsItem = srItemMapper.selectSrItemByName(CREDITS_ITEM_NAME);
         return expUpgradeMapper.selectByStarLevel(starLevel)
                 .stream()
-                .map(this::convertToVO)
+                .map(entity -> convertToVO(entity, expItem, creditsItem))
                 .collect(Collectors.toList());
     }
 
@@ -105,6 +115,12 @@ public class SrLightconeExpUpgradeServiceImpl implements ISrLightconeExpUpgradeS
     }
 
     private SrLightconeExpUpgradeVO convertToVO(SrLightconeExpUpgrade entity) {
+        return convertToVO(entity,
+                srItemMapper.selectSrItemByName(EXP_ITEM_NAME),
+                srItemMapper.selectSrItemByName(CREDITS_ITEM_NAME));
+    }
+
+    private SrLightconeExpUpgradeVO convertToVO(SrLightconeExpUpgrade entity, SrItem expItem, SrItem creditsItem) {
         SrLightconeExpUpgradeVO vo = new SrLightconeExpUpgradeVO();
         vo.setId(entity.getId());
         vo.setStarLevel(entity.getStarLevel());
@@ -113,16 +129,13 @@ public class SrLightconeExpUpgradeServiceImpl implements ISrLightconeExpUpgradeS
         vo.setExpRequired(entity.getExpRequired());
         vo.setCreditsRequired(entity.getCreditsRequired());
 
-        // 查询光锥经验书（从数据库sr_item表获取）
-        SrItem expItem = findItemByName("稀薄以太");
+        // 经验书/信用点物品按名称精确匹配 sr_item（避免 LIKE 命中多条同名记录导致取值漂移）
         if (expItem != null) {
             vo.setExpItemId(expItem.getId());
             vo.setExpItemName(expItem.getItemName());
             vo.setExpItemImage(expItem.getImage());
         }
 
-        // 查询信用点
-        SrItem creditsItem = findItemByName("信用点");
         if (creditsItem != null) {
             vo.setCreditsItemId(creditsItem.getId());
             vo.setCreditsItemName(creditsItem.getItemName());
@@ -130,15 +143,5 @@ public class SrLightconeExpUpgradeServiceImpl implements ISrLightconeExpUpgradeS
         }
 
         return vo;
-    }
-
-    /**
-     * 根据名称查询材料
-     */
-    private SrItem findItemByName(String name) {
-        SrItem query = new SrItem();
-        query.setItemName(name);
-        List<SrItem> items = srItemMapper.selectSrItemList(query);
-        return items.isEmpty() ? null : items.get(0);
     }
 }

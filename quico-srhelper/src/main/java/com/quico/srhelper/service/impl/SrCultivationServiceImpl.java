@@ -24,6 +24,7 @@ import com.quico.srhelper.mapper.SrUserCharacterMapper;
 import com.quico.srhelper.mapper.SrUserItemMapper;
 import com.quico.srhelper.service.ISrCharacterExpUpgradeService;
 import com.quico.srhelper.service.ISrCultivationService;
+import com.quico.srhelper.service.helper.UsableChecker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -52,11 +53,14 @@ public class SrCultivationServiceImpl implements ISrCultivationService {
     private final SrItemMapper itemMapper;
     private final SrUserItemMapper userItemMapper;
     private final ISrCharacterExpUpgradeService expUpgradeService;
+    private final UsableChecker usableChecker;
     
     private static final Integer MAX_LEVEL = 80;
     private static final Integer MAX_SKILL_LEVEL = 10;
     private static final Integer MAX_BASIC_ATK_LEVEL = 6;
     private static final Long EXP_PER_BOOK = 1000L; // 每本旅行见闻提供的经验值
+    /** 角色升级实际消耗的经验书物品名（与详情展示用的"经验值"物品解耦） */
+    private static final String EXP_BOOK_NAME = "旅行见闻";
     
     @Override
     public SrCultivationCalcVO calculateTotalCultivation(Long userId, Integer targetLevel) {
@@ -159,8 +163,12 @@ public class SrCultivationServiceImpl implements ISrCultivationService {
         SrUserCharacter query = new SrUserCharacter();
         query.setUserId(userId);
         List<SrUserCharacter> userCharacters = userCharacterMapper.selectSrUserCharacterList(query);
-        
+
+        // 未完成材料绑定的角色不参与养成计算
+        Set<Long> usableCharacterIds = usableChecker.getUsableCharacterIds();
+
         for (SrUserCharacter uc : userCharacters) {
+            if (!usableCharacterIds.contains(uc.getCharacterId())) continue;
             SrCharacter character = characterMapper.selectSrCharacterById(uc.getCharacterId());
             if (character == null) continue;
             
@@ -212,6 +220,9 @@ public class SrCultivationServiceImpl implements ISrCultivationService {
         if (character == null) {
             return null;
         }
+        
+        // 兜底校验：材料绑定未完成（非8行）的角色不可进行养成计算
+        usableChecker.assertCharacterUsable(uc.getCharacterId());
         
         SrCharacterCultivationVO result = new SrCharacterCultivationVO();
         
@@ -625,17 +636,20 @@ public class SrCultivationServiceImpl implements ISrCultivationService {
         }
         
         log.debug("计算经验书和信用点，当前等级：{}，目标等级：{}", currentLevel, targetLevel);
-        // 复用角色经验升级配置的 Redis 缓存，VO 中已带经验书/信用点物品ID
+        // 复用角色经验升级配置的 Redis 缓存获取各等级区间的经验/信用点数值；
+        // 实际消耗的经验书为「旅行见闻」，与配置表中仅作展示的「经验值」物品解耦，这里独立按名称解析
+        SrItem expBook = itemMapper.selectSrItemByName(EXP_BOOK_NAME);
+        Long expBookItemId = expBook != null ? expBook.getId() : null;
         List<SrCharacterExpUpgradeVO> expUpgrades = expUpgradeService.selectAllExpUpgrades();
         
         for (SrCharacterExpUpgradeVO upgrade : expUpgrades) {
             // 只计算当前等级之后需要的经验
             if (upgrade.getMinLevel() != null && upgrade.getMaxLevel() != null
                     && upgrade.getMinLevel() >= currentLevel && upgrade.getMaxLevel() <= targetLevel) {
-                if (upgrade.getExpItemId() != null && upgrade.getExpRequired() != null) {
+                if (expBookItemId != null && upgrade.getExpRequired() != null) {
                     // 将经验值转换为经验书数量（向上取整）
                     Long expBooks = (upgrade.getExpRequired() + EXP_PER_BOOK - 1) / EXP_PER_BOOK;
-                    materialMap.merge(upgrade.getExpItemId(), expBooks, Long::sum);
+                    materialMap.merge(expBookItemId, expBooks, Long::sum);
                     log.debug("等级区间 {} → {}：经验书 {} 本，信用点 {}",
                             upgrade.getMinLevel(), upgrade.getMaxLevel(), expBooks, upgrade.getCreditsRequired());
                 }

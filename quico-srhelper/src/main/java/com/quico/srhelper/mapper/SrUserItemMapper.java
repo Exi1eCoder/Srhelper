@@ -68,4 +68,21 @@ public interface SrUserItemMapper
      * @return 用户持有材料
      */
     public SrUserItem selectByUserIdAndItemId(@Param("userId") Long userId, @Param("itemId") Long itemId);
+
+    /**
+     * 批量 Upsert 用户持有材料（数量>0，依赖 (user_id, item_id) 唯一索引）
+     * 
+     * @param list 用户持有材料集合
+     * @return 结果
+     */
+    public int batchUpsert(@Param("list") List<SrUserItem> list);
+
+    /**
+     * 按用户ID和材料ID集合物理删除记录（数量<=0）
+     * 
+     * @param userId 用户ID
+     * @param itemIds 材料ID集合
+     * @return 结果
+     */
+    public int deleteByUserIdAndItemIds(@Param("userId") Long userId, @Param("itemIds") List<Long> itemIds);
 }

@@ -37,6 +37,14 @@ public interface ISrUserItemService
     public int insertSrUserItem(SrUserItem srUserItem);
 
     /**
+     * 批量新增或更新用户持有材料（按 userId + itemId 判断，已存在则更新）
+     * 
+     * @param list 用户持有材料集合
+     * @return 结果
+     */
+    public int batchInsertOrUpdate(List<SrUserItem> list);
+
+    /**
      * 修改用户持有材料
      * 
      * @param srUserItem 用户持有材料

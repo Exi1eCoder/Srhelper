@@ -17,6 +17,7 @@ import com.quico.common.annotation.Log;
 import com.quico.common.core.controller.BaseController;
 import com.quico.common.core.domain.AjaxResult;
 import com.quico.common.enums.BusinessType;
+import com.quico.common.exception.BusinessException;
 import com.quico.srhelper.domain.SrUserLightCone;
 import com.quico.srhelper.domain.vo.SrLightConeCultivationVO;
 import com.quico.srhelper.service.ISrUserLightConeService;
@@ -24,6 +25,7 @@ import com.quico.srhelper.service.ISrUserLightConeService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 import com.quico.srhelper.service.ISrLightConeCultivationService;
+import com.quico.srhelper.service.helper.UsableChecker;
 import com.quico.common.utils.poi.ExcelUtil;
 import com.quico.common.core.page.TableDataInfo;
 
@@ -46,6 +48,8 @@ public class SrUserLightConeController extends BaseController
 
     /**
      * 查询用户持有光锥列表
+     * onlyUsable 不传或 false，返回全量
+     * onlyUsable=true，仅保留材料绑定完整的数据
      */
     @PreAuthorize("@ss.hasPermi('srhelper:userLightCone:list')")
     @GetMapping("/list")
@@ -53,6 +57,7 @@ public class SrUserLightConeController extends BaseController
     {
         // startPage();
         List<SrUserLightCone> list = srUserLightConeService.selectSrUserLightConeList(srUserLightCone);
+        list = UsableChecker.filterUsable(list, true, SrUserLightCone::getUsable);
         return getDataTable(list);
     }
 
@@ -67,6 +72,7 @@ public class SrUserLightConeController extends BaseController
     {
         Long userId = getUserId();
         List<SrUserLightCone> list = srUserLightConeService.selectByUserIdWithDetails(userId, path, starLevel, lightConeName);
+        list = UsableChecker.filterUsable(list, true, SrUserLightCone::getUsable);
         return success(list);
     }
 
@@ -82,9 +88,10 @@ public class SrUserLightConeController extends BaseController
     {
         if (userId == null || userId <= 0)
         {
-            return AjaxResult.error("用户ID参数无效");
+            throw BusinessException.badRequest("用户ID参数无效");
         }
         List<SrUserLightCone> list = srUserLightConeService.selectByUserIdWithDetails(userId, path, starLevel, lightConeName);
+        list = UsableChecker.filterUsable(list, true, SrUserLightCone::getUsable);
         return success(list);
     }
 

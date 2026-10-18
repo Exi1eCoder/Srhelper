@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import com.quico.common.annotation.Log;
@@ -23,8 +24,10 @@ import com.quico.common.utils.SecurityUtils;
 import com.quico.srhelper.domain.SrItem;
 import com.quico.srhelper.domain.dto.SrItemBindDTO;
 import com.quico.srhelper.service.ISrItemService;
+import com.quico.srhelper.service.helper.UsableChecker;
 import com.quico.common.utils.poi.ExcelUtil;
 import com.quico.common.core.page.TableDataInfo;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * 材料一览Controller
@@ -35,6 +38,7 @@ import com.quico.common.core.page.TableDataInfo;
 @Tag(name = "材料一览Controller", description = "材料一览相关接口")
 @RestController
 @RequestMapping("/srhelper/srItem")
+@Slf4j
 public class SrItemController extends BaseController
 {
     @Autowired
@@ -42,14 +46,18 @@ public class SrItemController extends BaseController
 
     /**
      * 查询材料一览列表
+     * onlyUsable 不传或 false，返回全量
+     * onlyUsable=true，仅保留材料绑定完整的数据
      */
     @Operation(summary = "查询材料一览列表", description = "分页查询材料一览信息")
     @PreAuthorize("@ss.hasPermi('srhelper:srItem:list')")
     @GetMapping("/list")
-    public TableDataInfo list(SrItem srItem)
+    public TableDataInfo list(SrItem srItem, @RequestParam(defaultValue = "true") Boolean onlyUsable)
     {
+        log.info("查询材料一览列表，onlyUsable={}", onlyUsable);
         // startPage();
         List<SrItem> list = srItemService.selectSrItemList(srItem);
+        list = UsableChecker.filterUsable(list, onlyUsable, SrItem::getUsable);
         return getDataTable(list);
     }
 

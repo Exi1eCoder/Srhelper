@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.quico.srhelper.mapper.SrItemMapper;
 import com.quico.srhelper.service.helper.MaterialBindSyncService;
+import com.quico.srhelper.service.helper.UsableChecker;
 import com.quico.srhelper.domain.SrItem;
 import com.quico.srhelper.domain.cache.SrItemListCache;
 import com.quico.srhelper.domain.dto.SrItemBindDTO;
@@ -39,6 +40,9 @@ public class SrItemServiceImpl implements ISrItemService
 
     @Autowired
     private MaterialBindSyncService materialBindSyncService;
+
+    @Autowired
+    private UsableChecker usableChecker;
 
     @Autowired
     private RedisTemplate<Object, Object> redisTemplate;
@@ -115,10 +119,27 @@ public class SrItemServiceImpl implements ISrItemService
                 return cached.getList();
             }
             List<SrItem> list = srItemMapper.selectSrItemList(srItem);
+            markUsable(list);
             redisTemplate.opsForValue().set(ITEM_LIST_CACHE_KEY, new SrItemListCache(list), SrhelperCacheConstants.TTL_CONFIG, TimeUnit.MINUTES);
             return list;
         }
-        return srItemMapper.selectSrItemList(srItem);
+        List<SrItem> list = srItemMapper.selectSrItemList(srItem);
+        markUsable(list);
+        return list;
+    }
+
+    /**
+     * 按高阶素材绑定完成度标记材料可用性
+     * 选择材料页返回全量数据，前端据 usable 过滤掉未完成绑定的 CAL/TRA 系列材料
+     */
+    private void markUsable(List<SrItem> list) {
+        if (list == null || list.isEmpty()) {
+            return;
+        }
+        Set<Long> completeSeriesIds = usableChecker.getCompleteSeriesIds();
+        for (SrItem item : list) {
+            item.setUsable(usableChecker.isItemUsable(item, completeSeriesIds));
+        }
     }
 
     /**
@@ -209,6 +230,8 @@ public class SrItemServiceImpl implements ISrItemService
             srItemMapper.updateSrItem(item4Star);
         }
         
+        // 高阶素材绑定变更会影响材料可用性，刷新材料一览缓存
+        clearItemListCache();
         return 1;
     }
 
@@ -437,6 +460,9 @@ public class SrItemServiceImpl implements ISrItemService
                 || (StringUtils.isEmpty(srItem.getItemName())
                     && StringUtils.isEmpty(srItem.getItemType())
                     // && StringUtils.isEmpty(srItem.getItemTag())
+                    && StringUtils.isEmpty(srItem.getAscensionType())
+                    && StringUtils.isEmpty(srItem.getCombatType())
+                    && StringUtils.isEmpty(srItem.getPath())
                     && StringUtils.isEmpty(srItem.getDescription())
                     && StringUtils.isEmpty(srItem.getReleaseVersion())
                     && srItem.getStarLevel() == null

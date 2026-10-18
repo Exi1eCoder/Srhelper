@@ -119,5 +119,7 @@ public class SrUserCharacter extends BaseEntity
     @Excel(name = "额外属性10")
     private Long statBonus10;
 
+    /** 对应图鉴角色材料绑定是否完整（可用性标记），查询时关联推导，不持久化 */
+    private Boolean usable;
 
 }

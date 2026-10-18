@@ -52,4 +52,7 @@ public class SrUserLightCone extends BaseEntity
     /** 命途（查询时关联） */
     private String path;
 
+    /** 对应图鉴光锥材料绑定是否完整（可用性标记），查询时关联推导，不持久化 */
+    private Boolean usable;
+
 }

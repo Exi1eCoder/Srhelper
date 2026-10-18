@@ -143,4 +143,18 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where series_id = #{seriesId}
         order by star_level
     </select>
+
+    <!-- 高阶素材绑定完整的系列锚点ID集合：二星 CAL/TRA 且同系列同类型共3行 -->
+    <select id="selectCompleteSeriesIds" resultType="java.lang.Long">
+        select t.id
+        from sr_item t
+        where t.star_level = 2
+          and t.ascension_type in ('CAL', 'TRA')
+          and t.series_id is not null
+          and t.series_id = t.id
+          and (select count(*)
+               from sr_item s
+               where s.series_id = t.id
+                 and s.ascension_type = t.ascension_type) = 3
+    </select>
 </mapper>

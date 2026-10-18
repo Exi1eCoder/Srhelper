@@ -8,6 +8,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import com.quico.common.core.domain.entity.SysDictData;
+import com.quico.common.exception.BusinessException;
 import com.quico.common.utils.DateUtils;
 import com.quico.common.utils.DictUtils;
 import com.quico.common.utils.SecurityUtils;
@@ -39,6 +40,7 @@ import com.quico.srhelper.mapper.SrCharacterStatBonusMaterialMapper;
 import com.quico.srhelper.service.helper.MaterialBindSyncService;
 import com.quico.srhelper.service.helper.AscensionMaterialGenerator;
 import com.quico.srhelper.service.helper.MaterialBindExpander;
+import com.quico.srhelper.service.helper.UsableChecker;
 import com.quico.srhelper.service.ISrCharacterExpUpgradeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -85,6 +87,9 @@ public class SrCharacterServiceImpl implements ISrCharacterService
     private MaterialBindExpander materialBindExpander;
 
     @Autowired
+    private UsableChecker usableChecker;
+
+    @Autowired
     private ISrCharacterExpUpgradeService expUpgradeService;
 
     @Autowired
@@ -126,10 +131,26 @@ public class SrCharacterServiceImpl implements ISrCharacterService
                 return cached.getList();
             }
             List<SrCharacter> list = srCharacterMapper.selectSrCharacterList(srCharacter);
+            markUsable(list);
             redisTemplate.opsForValue().set(CHAR_LIST_CACHE_KEY, new SrCharacterListCache(list), SrhelperCacheConstants.TTL_CONFIG, TimeUnit.MINUTES);
             return list;
         }
-        return srCharacterMapper.selectSrCharacterList(srCharacter);
+        List<SrCharacter> list = srCharacterMapper.selectSrCharacterList(srCharacter);
+        markUsable(list);
+        return list;
+    }
+
+    /**
+     * 按材料绑定完成度标记角色可用性（图鉴页返回全量数据，前端据 usable 置灰/过滤）
+     */
+    private void markUsable(List<SrCharacter> list) {
+        if (list == null || list.isEmpty()) {
+            return;
+        }
+        Set<Long> usableIds = usableChecker.getUsableCharacterIds();
+        for (SrCharacter character : list) {
+            character.setUsable(usableIds.contains(character.getId()));
+        }
     }
 
     /**
@@ -258,6 +279,9 @@ public class SrCharacterServiceImpl implements ISrCharacterService
             return;
         }
 
+        // 强校验：TRA/CAL 必须绑定系列ID，缺失即阻断保存，避免产出不完整系列
+        validateBindSeriesIds(materialBinds);
+
         // 删除旧数据
         materialBindMapper.deleteByCharacterId(characterId);
 
@@ -275,6 +299,19 @@ public class SrCharacterServiceImpl implements ISrCharacterService
             bind.setCreateTime(now);
             bind.setUpdateTime(now);
             materialBindMapper.insertSrCharacterMaterialBind(bind);
+        }
+    }
+
+    /**
+     * 强校验：TRA（世界掉落）/CAL（拟造花萼）类材料必须绑定系列ID（seriesId），
+     * 否则同系列无法补齐三档材料，直接抛 422 阻断保存
+     */
+    private void validateBindSeriesIds(List<SrCharacterMaterialBind> materialBinds) {
+        for (SrCharacterMaterialBind bind : materialBinds) {
+            if (materialBindExpander.isExpandable(bind.getItemAscensionType()) && bind.getSeriesId() == null) {
+                throw BusinessException.unprocessable(
+                        "材料[" + bind.getItemName() + "]晋升素材系列未绑定，无法保存材料绑定");
+            }
         }
     }
 

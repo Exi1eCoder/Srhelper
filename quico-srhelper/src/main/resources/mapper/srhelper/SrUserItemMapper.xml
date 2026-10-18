@@ -39,6 +39,18 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where user_id = #{userId} and item_id = #{itemId}
     </select>
 
+    <insert id="batchUpsert" parameterType="java.util.List">
+        insert into sr_user_item (user_id, item_id, quantity, create_by, create_time, update_by, update_time)
+        values
+        <foreach item="item" collection="list" separator=",">
+            (#{item.userId}, #{item.itemId}, #{item.quantity}, #{item.createBy}, now(), #{item.updateBy}, now())
+        </foreach>
+        on duplicate key update
+            quantity = values(quantity),
+            update_by = values(update_by),
+            update_time = values(update_time)
+    </insert>
+
     <insert id="insertSrUserItem" parameterType="SrUserItem" useGeneratedKeys="true" keyProperty="id">
         insert into sr_user_item
         <trim prefix="(" suffix=")" suffixOverrides=",">
@@ -86,6 +98,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         delete from sr_user_item where id in 
         <foreach item="id" collection="array" open="(" separator="," close=")">
             #{id}
+        </foreach>
+    </delete>
+
+    <delete id="deleteByUserIdAndItemIds">
+        delete from sr_user_item where user_id = #{userId} and item_id in
+        <foreach item="itemId" collection="itemIds" open="(" separator="," close=")">
+            #{itemId}
         </foreach>
     </delete>
 </mapper>

@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import com.quico.common.annotation.Log;
@@ -23,8 +24,10 @@ import com.quico.common.utils.SecurityUtils;
 import com.quico.srhelper.domain.SrCharacter;
 import com.quico.srhelper.domain.dto.SrCharacterSaveDTO;
 import com.quico.srhelper.service.ISrCharacterService;
+import com.quico.srhelper.service.helper.UsableChecker;
 import com.quico.common.utils.poi.ExcelUtil;
 import com.quico.common.core.page.TableDataInfo;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * 角色Controller
@@ -35,6 +38,7 @@ import com.quico.common.core.page.TableDataInfo;
 @Tag(name = "角色Controller", description = "角色相关接口")
 @RestController
 @RequestMapping("/srhelper/srCharacter")
+@Slf4j
 public class SrCharacterController extends BaseController
 {
     @Autowired
@@ -42,13 +46,17 @@ public class SrCharacterController extends BaseController
 
     /**
      * 查询角色列表
+     * onlyUsable 不传或 false，返回全量
+     * onlyUsable=true，仅保留材料绑定完整的数据
      */
     @Operation(summary = "查询角色列表", description = "分页查询角色信息")
     @PreAuthorize("@ss.hasPermi('srhelper:character:list')")
     @GetMapping("/list")
-    public TableDataInfo list(SrCharacter srCharacter)
+    public TableDataInfo list(SrCharacter srCharacter, @RequestParam(defaultValue = "true") Boolean onlyUsable)
     {
+        log.info("查询角色列表，onlyUsable={}", onlyUsable);
         List<SrCharacter> list = srCharacterService.selectSrCharacterList(srCharacter);
+        list = UsableChecker.filterUsable(list, onlyUsable, SrCharacter::getUsable);
         return getDataTable(list);
     }
 

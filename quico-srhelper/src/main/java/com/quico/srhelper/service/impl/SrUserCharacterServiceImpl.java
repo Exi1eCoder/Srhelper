@@ -1,7 +1,8 @@
 package com.quico.srhelper.service.impl;
 
 import java.util.List;
-import com.quico.common.exception.ServiceException;
+import java.util.Set;
+import com.quico.common.exception.BusinessException;
 import com.quico.common.utils.DateUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -11,6 +12,7 @@ import com.quico.srhelper.domain.SrCharacter;
 import com.quico.srhelper.domain.SrUserCharacter;
 import com.quico.srhelper.domain.enums.CharacterPathEnum;
 import com.quico.srhelper.service.ISrUserCharacterService;
+import com.quico.srhelper.service.helper.UsableChecker;
 
 /**
  * 我的角色Service业务层处理
@@ -26,6 +28,9 @@ public class SrUserCharacterServiceImpl implements ISrUserCharacterService
 
     @Autowired
     private SrCharacterMapper srCharacterMapper;
+
+    @Autowired
+    private UsableChecker usableChecker;
 
     /**
      * 查询我的角色
@@ -48,7 +53,23 @@ public class SrUserCharacterServiceImpl implements ISrUserCharacterService
     @Override
     public List<SrUserCharacter> selectSrUserCharacterList(SrUserCharacter srUserCharacter)
     {
-        return srUserCharacterMapper.selectSrUserCharacterList(srUserCharacter);
+        List<SrUserCharacter> list = srUserCharacterMapper.selectSrUserCharacterList(srUserCharacter);
+        markUsable(list);
+        return list;
+    }
+
+    /**
+     * 按图鉴角色材料绑定完成度标记可用性（未完成绑定的角色不可展示与展开业务）
+     */
+    private void markUsable(List<SrUserCharacter> list)
+    {
+        if (list == null || list.isEmpty()) {
+            return;
+        }
+        Set<Long> usableIds = usableChecker.getUsableCharacterIds();
+        for (SrUserCharacter character : list) {
+            character.setUsable(usableIds.contains(character.getCharacterId()));
+        }
     }
 
     /**
@@ -140,14 +161,14 @@ public class SrUserCharacterServiceImpl implements ISrUserCharacterService
     }
 
     /**
-     * 校验命途特有维度等级，空值取默认值1，超出范围抛出业务异常
+     * 校验命途特有维度等级，空值取默认值1，超出范围抛业务校验异常（422）
      */
     private Long validateLevel(Long value, int maxLevel, String dimensionName)
     {
         long level = value != null ? value : CharacterPathEnum.DEFAULT_LEVEL;
         if (level < 1 || level > maxLevel)
         {
-            throw new ServiceException(dimensionName + "等级必须在1-" + maxLevel + "之间");
+            throw new BusinessException(dimensionName + "等级必须在1-" + maxLevel + "之间");
         }
         return level;
     }

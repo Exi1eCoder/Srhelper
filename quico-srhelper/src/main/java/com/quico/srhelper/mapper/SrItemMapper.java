@@ -83,4 +83,12 @@ public interface SrItemMapper
      * @return 同系列材料列表
      */
     public List<SrItem> selectBySeriesId(Long seriesId);
+
+    /**
+     * 查询高阶素材绑定完整的系列锚点ID集合
+     * 以二星 CAL/TRA 行为锚点，要求同系列同类型共3行（二/三/四星）
+     * 
+     * @return 完整系列锚点ID集合
+     */
+    public List<Long> selectCompleteSeriesIds();
 }

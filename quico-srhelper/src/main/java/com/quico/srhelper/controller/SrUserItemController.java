@@ -22,6 +22,7 @@ import com.quico.common.core.domain.AjaxResult;
 import com.quico.common.enums.BusinessType;
 import com.quico.srhelper.domain.SrUserItem;
 import com.quico.srhelper.service.ISrUserItemService;
+import com.quico.srhelper.service.helper.UsableChecker;
 import com.quico.common.utils.poi.ExcelUtil;
 import com.quico.common.core.page.TableDataInfo;
 
@@ -41,6 +42,8 @@ public class SrUserItemController extends BaseController
 
     /**
      * 查询用户持有材料列表
+     * onlyUsable 不传或 false，返回全量
+     * onlyUsable=true，仅保留材料绑定完整的数据
      */
     @Operation(summary = "查询用户持有材料列表", description = "分页查询用户持有材料信息")
     @PreAuthorize("@ss.hasPermi('srhelper:userItem:list')")
@@ -49,6 +52,7 @@ public class SrUserItemController extends BaseController
     {
         startPage();
         List<SrUserItem> list = srUserItemService.selectSrUserItemList(srUserItem);
+        list = UsableChecker.filterUsable(list, true, SrUserItem::getUsable);
         return getDataTable(list);
     }
 
@@ -117,6 +121,18 @@ public class SrUserItemController extends BaseController
             return toAjax(srUserItemService.updateSrUserItem(srUserItem));
         }
         return toAjax(srUserItemService.insertSrUserItem(srUserItem));
+    }
+
+    /**
+     * 批量新增用户持有材料（如果已存在则更新）
+     */
+    @Operation(summary = "批量新增或更新用户持有材料", description = "批量新增或更新用户持有材料，按 userId + itemId 判断，已存在则更新")
+    @PreAuthorize("@ss.hasPermi('srhelper:userItem:add')")
+    @Log(title = "用户持有材料", businessType = BusinessType.INSERT)
+    @PostMapping("/batch")
+    public AjaxResult batchAdd(@RequestBody List<SrUserItem> list)
+    {
+        return toAjax(srUserItemService.batchInsertOrUpdate(list));
     }
 
     /**

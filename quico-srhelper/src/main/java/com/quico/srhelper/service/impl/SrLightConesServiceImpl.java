@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import com.quico.common.core.domain.entity.SysDictData;
+import com.quico.common.exception.BusinessException;
 import com.quico.common.utils.DateUtils;
 import com.quico.common.utils.DictUtils;
 import com.quico.common.utils.SecurityUtils;
@@ -24,6 +25,7 @@ import com.quico.srhelper.domain.cache.SrLightConesListCache;
 import com.quico.srhelper.domain.dto.LightConeSaveDTO;
 import com.quico.srhelper.service.ISrLightConesService;
 import com.quico.srhelper.service.helper.MaterialBindExpander;
+import com.quico.srhelper.service.helper.UsableChecker;
 import com.quico.srhelper.service.helper.MaterialBindSyncService;
 import com.quico.srhelper.service.helper.LightconeAscensionMaterialGenerator;
 import com.quico.srhelper.service.helper.GachaRecordImageCacheManager;
@@ -52,6 +54,9 @@ public class SrLightConesServiceImpl implements ISrLightConesService
 
     @Autowired
     private MaterialBindExpander materialBindExpander;
+
+    @Autowired
+    private UsableChecker usableChecker;
 
     @Autowired
     private LightconeAscensionMaterialGenerator ascensionGenerator;
@@ -95,10 +100,26 @@ public class SrLightConesServiceImpl implements ISrLightConesService
                 return cached.getList();
             }
             List<SrLightCones> list = srLightConesMapper.selectSrLightConesList(srLightCones);
+            markUsable(list);
             redisTemplate.opsForValue().set(LIGHTCONE_LIST_CACHE_KEY, new SrLightConesListCache(list), SrhelperCacheConstants.TTL_CONFIG, TimeUnit.MINUTES);
             return list;
         }
-        return srLightConesMapper.selectSrLightConesList(srLightCones);
+        List<SrLightCones> list = srLightConesMapper.selectSrLightConesList(srLightCones);
+        markUsable(list);
+        return list;
+    }
+
+    /**
+     * 按材料绑定完成度标记光锥可用性（图鉴页返回全量数据，前端据 usable 置灰/过滤）
+     */
+    private void markUsable(List<SrLightCones> list) {
+        if (list == null || list.isEmpty()) {
+            return;
+        }
+        Set<Long> usableIds = usableChecker.getUsableLightconeIds();
+        for (SrLightCones lightCone : list) {
+            lightCone.setUsable(usableIds.contains(lightCone.getId()));
+        }
     }
 
     /**
@@ -170,9 +191,18 @@ public class SrLightConesServiceImpl implements ISrLightConesService
         Long lightConeId;
         Date now = DateUtils.getNowDate();
 
+        // 无绑定材料（非 simple 模式）：视为未配置完成，新光锥不落库
+        boolean noBinds = !"simple".equals(dto.getChangeType())
+                && dto.getMaterialBinds() != null
+                && dto.getMaterialBinds().isEmpty();
+
         // 1. 保存/更新光锥基本信息
         String currentUser = SecurityUtils.getUserId().toString();
         if (dto.getLightCone().getId() == null) {
+            // 新光锥无绑定材料：直接跳过，不插入空壳记录
+            if (noBinds) {
+                return null;
+            }
             dto.getLightCone().setCreateBy(currentUser);
             dto.getLightCone().setUpdateBy(currentUser);
             dto.getLightCone().setCreateTime(now);
@@ -199,46 +229,60 @@ public class SrLightConesServiceImpl implements ISrLightConesService
             return lightConeId;
         }
 
-        // 2. 保存材料绑定（先删后插，TRA/CAL通过seriesId扩展高阶素材）
-        if (dto.getMaterialBinds() != null) {
+        // 无绑定材料（已有光锥）：绑定与晋升材料一并清空后跳过生成，
+        // 避免先删后插把上一次生成的完整晋升材料覆盖成不全的半截数据
+        if (noBinds) {
             materialBindMapper.deleteByLightConeId(lightConeId);
-            int sortOrder = 0;
-            for (SrLightconeMaterialBind bind : dto.getMaterialBinds()) {
-                // TRA/CAL 类型扩展为同系列全部稀有度
-                if (materialBindExpander.isExpandable(bind.getItemAscensionType()) && bind.getSeriesId() != null) {
-                    List<SrItem> seriesItems = materialBindExpander.expandBySeriesId(bind.getSeriesId());
-                    for (SrItem item : seriesItems) {
-                        SrLightconeMaterialBind expanded = SrLightconeMaterialBind.builder()
-                                .lightconeId(dto.getLightCone().getId())
-                                .lightconeName(dto.getLightCone().getLightConeName())
-                                .itemAscensionType(bind.getItemAscensionType())
-                                .itemId(item.getId())
-                                .seriesId(bind.getSeriesId())
-                                .itemName(item.getItemName())
-                                .itemImage(item.getImage())
-                                .rarityLevel(item.getStarLevel().intValue())
-                                .sortOrder(sortOrder++)
-                                .build();
-                        expanded.setCreateBy(currentUser);
-                        expanded.setUpdateBy(currentUser);
-                        expanded.setCreateTime(now);
-                        expanded.setUpdateTime(now);
-                        materialBindMapper.insert(expanded);
-                    }
-                } else {
-                    bind.setLightconeId(lightConeId);
-                    bind.setLightconeName(dto.getLightCone().getLightConeName());
-                    bind.setSortOrder(sortOrder++);
-                    bind.setCreateBy(currentUser);
-                    bind.setUpdateBy(currentUser);
-                    bind.setCreateTime(now);
-                    bind.setUpdateTime(now);
-                    materialBindMapper.insert(bind);
-                }
-            }
-            // 3. 根据模板自动生成晋升材料
-            ascensionGenerator.generateAndSave(lightConeId, dto.getLightCone(), dto.getMaterialBinds());
+            ascensionGenerator.clearByLightConeId(lightConeId);
+            clearLightConeListCache();
+            return lightConeId;
         }
+
+        // 2. 保存材料绑定（先删后插，TRA/CAL通过seriesId扩展高阶素材）
+        // 强校验：TRA（世界掉落）/CAL（拟造花萼）类材料必须绑定系列ID，缺失即阻断保存
+        for (SrLightconeMaterialBind bind : dto.getMaterialBinds()) {
+            if (materialBindExpander.isExpandable(bind.getItemAscensionType()) && bind.getSeriesId() == null) {
+                throw BusinessException.unprocessable(
+                        "材料[" + bind.getItemName() + "]晋升素材系列未绑定，无法保存材料绑定");
+            }
+        }
+        materialBindMapper.deleteByLightConeId(lightConeId);
+        int sortOrder = 0;
+        for (SrLightconeMaterialBind bind : dto.getMaterialBinds()) {
+            // TRA/CAL 类型扩展为同系列全部稀有度
+            if (materialBindExpander.isExpandable(bind.getItemAscensionType()) && bind.getSeriesId() != null) {
+                List<SrItem> seriesItems = materialBindExpander.expandBySeriesId(bind.getSeriesId());
+                for (SrItem item : seriesItems) {
+                    SrLightconeMaterialBind expanded = SrLightconeMaterialBind.builder()
+                            .lightconeId(dto.getLightCone().getId())
+                            .lightconeName(dto.getLightCone().getLightConeName())
+                            .itemAscensionType(bind.getItemAscensionType())
+                            .itemId(item.getId())
+                            .seriesId(bind.getSeriesId())
+                            .itemName(item.getItemName())
+                            .itemImage(item.getImage())
+                            .rarityLevel(item.getStarLevel().intValue())
+                            .sortOrder(sortOrder++)
+                            .build();
+                    expanded.setCreateBy(currentUser);
+                    expanded.setUpdateBy(currentUser);
+                    expanded.setCreateTime(now);
+                    expanded.setUpdateTime(now);
+                    materialBindMapper.insert(expanded);
+                }
+            } else {
+                bind.setLightconeId(lightConeId);
+                bind.setLightconeName(dto.getLightCone().getLightConeName());
+                bind.setSortOrder(sortOrder++);
+                bind.setCreateBy(currentUser);
+                bind.setUpdateBy(currentUser);
+                bind.setCreateTime(now);
+                bind.setUpdateTime(now);
+                materialBindMapper.insert(bind);
+            }
+        }
+        // 3. 根据模板自动生成晋升材料
+        ascensionGenerator.generateAndSave(lightConeId, dto.getLightCone(), dto.getMaterialBinds());
 
         clearLightConeListCache();
         return lightConeId;

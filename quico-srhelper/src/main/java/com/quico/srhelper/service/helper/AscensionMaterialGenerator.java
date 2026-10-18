@@ -68,7 +68,8 @@ public class AscensionMaterialGenerator {
         String templateType = resolveTemplateType(character);
 
         // 2-3. 加载基础模板并按命途合并、展开
-        // 记忆/欢愉模板表只存与普通五星不同的差异条目，需先继承 FiveStarNormal 全部条目再覆盖，最后展开
+        // 记忆/欢愉模板表存命途专属条目，其中记忆的额外属性(statbonus)、欢愉除等级突破外的条目均取自命途自身模板，
+        // 需先继承 FiveStarNormal 其余条目再覆盖，最后展开
         List<SrCharacterAscensionTemplate> expanded = loadExpandedTemplates(templateType);
 
         // 4. 加载材料绑定用于占位符替换 + itemId→rarity 映射
@@ -144,8 +145,8 @@ public class AscensionMaterialGenerator {
      * 模板继承关系（以模板表真实数据为准）：
      * - 四星(FourStarNormal)：独立完整模板，仅做通用展开 skill → talent + ultimate
      * - 普通五星(FiveStarNormal)：完整模板，仅做通用展开 skill → talent + ultimate
-     * - 记忆(Remembrance)：继承 FiveStarNormal 全部条目（等级突破/普攻/战技/额外能力/额外属性），
-     *   模板表中的记忆专属行（basicatk/skill）按 类型+突破等级+槽位 覆盖基础条目，
+     * - 记忆(Remembrance)：继承 FiveStarNormal 条目，但额外属性(statbonus)改用记忆自身模板（不继承普通五星），
+     *   模板表中的记忆专属行（basicatk/skill/statbonus）按 类型+突破等级+槽位 覆盖基础条目，
      *   再展开 skill → talent + ultimate、basicatk → memospriteskill + memospritetalent
      * - 欢愉(Elation)：仅继承 FiveStarNormal 的等级突破(levelasc)条目，
      *   其余条目全部取自 Elation 自身模板，再展开 skill → talent + ultimate
@@ -166,6 +167,10 @@ public class AscensionMaterialGenerator {
             // 欢愉：仅等级突破(levelasc)沿用普通五星模板，其余条目一律使用 Elation 自身模板
             base = filterByAscensionType(
                     templateMapper.selectByTemplateType(TPL_FIVE_STAR_NORMAL), "levelasc");
+        } else if (TPL_REMEMBRANCE.equals(templateType)) {
+            // 记忆：额外属性(statbonus)为记忆命途独立模板，不使用普通五星的对应条目
+            base = excludeAscensionType(
+                    templateMapper.selectByTemplateType(TPL_FIVE_STAR_NORMAL), "statbonus");
         } else {
             base = templateMapper.selectByTemplateType(TPL_FIVE_STAR_NORMAL);
         }
@@ -205,9 +210,23 @@ public class AscensionMaterialGenerator {
     }
 
     /**
+     * 排除指定 ascensionType 的模板条目
+     */
+    private List<SrCharacterAscensionTemplate> excludeAscensionType(
+            List<SrCharacterAscensionTemplate> templates, String ascensionType) {
+        List<SrCharacterAscensionTemplate> filtered = new ArrayList<>();
+        for (SrCharacterAscensionTemplate tpl : templates) {
+            if (!ascensionType.equalsIgnoreCase(tpl.getAscensionType())) {
+                filtered.add(tpl);
+            }
+        }
+        return filtered;
+    }
+
+    /**
      * 用命途专属模板覆盖基础模板
      * 按 ascensionType + breakLevel + materialSlot 匹配：命中则覆盖（保留基础条目位置），
-     * 未命中则追加；基础模板有而专属模板没有的条目（如记忆的等级突破/额外能力/额外属性）原样保留
+     * 未命中则追加；基础模板有而专属模板没有的条目（如记忆的等级突破/额外能力）原样保留
      */
     private List<SrCharacterAscensionTemplate> mergeOverride(
             List<SrCharacterAscensionTemplate> base, List<SrCharacterAscensionTemplate> override) {

@@ -35,6 +35,11 @@ public class SrCharacterExpUpgradeServiceImpl implements ISrCharacterExpUpgradeS
 
     private static final String CACHE_KEY = SrhelperCacheConstants.CHAR_EXP_UPGRADE_KEY + "list";
 
+    /** 角色经验升级展示物品名（仅用于详情/配置展示，非实际消耗材料） */
+    private static final String EXP_ITEM_NAME = "经验值";
+    /** 信用点物品名 */
+    private static final String CREDITS_ITEM_NAME = "信用点";
+
     @Override
     public List<SrCharacterExpUpgradeVO> selectAllExpUpgrades() {
         SrCharacterExpUpgradeCache cached = (SrCharacterExpUpgradeCache) redisTemplate.opsForValue().get(CACHE_KEY);
@@ -43,9 +48,12 @@ public class SrCharacterExpUpgradeServiceImpl implements ISrCharacterExpUpgradeS
             return cached.getList();
         }
         log.debug("selectAllExpUpgrades cached is null, 从数据库中查询角色经验升级配置");
+        // 经验书/信用点物品固定，整表转换前只解析一次，避免逐行重复查库
+        SrItem expItem = srItemMapper.selectSrItemByName(EXP_ITEM_NAME);
+        SrItem creditsItem = srItemMapper.selectSrItemByName(CREDITS_ITEM_NAME);
         List<SrCharacterExpUpgradeVO> list = expUpgradeMapper.selectAllOrderByMinLevel()
                 .stream()
-                .map(this::convertToVO)
+                .map(entity -> convertToVO(entity, expItem, creditsItem))
                 .collect(Collectors.toList());
         redisTemplate.opsForValue().set(CACHE_KEY, new SrCharacterExpUpgradeCache(list), SrhelperCacheConstants.TTL_CONFIG, TimeUnit.MINUTES);
         return list;
@@ -129,6 +137,12 @@ public class SrCharacterExpUpgradeServiceImpl implements ISrCharacterExpUpgradeS
     }
     
     private SrCharacterExpUpgradeVO convertToVO(SrCharacterExpUpgrade entity) {
+        return convertToVO(entity,
+                srItemMapper.selectSrItemByName(EXP_ITEM_NAME),
+                srItemMapper.selectSrItemByName(CREDITS_ITEM_NAME));
+    }
+
+    private SrCharacterExpUpgradeVO convertToVO(SrCharacterExpUpgrade entity, SrItem expItem, SrItem creditsItem) {
         SrCharacterExpUpgradeVO vo = new SrCharacterExpUpgradeVO();
         vo.setId(entity.getId());
         vo.setMinLevel(entity.getMinLevel());
@@ -136,16 +150,13 @@ public class SrCharacterExpUpgradeServiceImpl implements ISrCharacterExpUpgradeS
         vo.setExpRequired(entity.getExpRequired());
         vo.setCreditsRequired(entity.getCreditsRequired());
         
-        // 查询经验书（从数据库sr_item表获取）
-        SrItem expItem = findItemByName("旅行见闻");
+        // 经验书/信用点物品按名称精确匹配 sr_item（避免 LIKE 命中多条同名记录导致取值漂移）
         if (expItem != null) {
             vo.setExpItemId(expItem.getId());
             vo.setExpItemName(expItem.getItemName());
             vo.setExpItemImage(expItem.getImage());
         }
         
-        // 查询信用点（从数据库sr_item表获取）
-        SrItem creditsItem = findItemByName("信用点");
         if (creditsItem != null) {
             vo.setCreditsItemId(creditsItem.getId());
             vo.setCreditsItemName(creditsItem.getItemName());
@@ -153,15 +164,5 @@ public class SrCharacterExpUpgradeServiceImpl implements ISrCharacterExpUpgradeS
         }
         
         return vo;
-    }
-    
-    /**
-     * 根据名称查询材料
-     */
-    private SrItem findItemByName(String name) {
-        SrItem query = new SrItem();
-        query.setItemName(name);
-        List<SrItem> items = srItemMapper.selectSrItemList(query);
-        return items.isEmpty() ? null : items.get(0);
     }
 }

@@ -16,6 +16,7 @@ import com.quico.srhelper.mapper.SrLightconeExpUpgradeMapper;
 import com.quico.srhelper.mapper.SrUserItemMapper;
 import com.quico.srhelper.mapper.SrUserLightConeMapper;
 import com.quico.srhelper.service.ISrLightConeCultivationService;
+import com.quico.srhelper.service.helper.UsableChecker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -44,6 +45,7 @@ public class SrLightConeCultivationServiceImpl implements ISrLightConeCultivatio
     private final SrLightconeExpUpgradeMapper expUpgradeMapper;
     private final SrItemMapper itemMapper;
     private final SrUserItemMapper userItemMapper;
+    private final UsableChecker usableChecker;
 
     private static final Integer MAX_LEVEL = 80;
 
@@ -72,6 +74,9 @@ public class SrLightConeCultivationServiceImpl implements ISrLightConeCultivatio
         {
             return null;
         }
+
+        // 兜底校验：材料绑定未完成（非6行）的光锥不可进行养成计算
+        usableChecker.assertLightconeUsable(ulc.getLightConeId());
 
         SrLightConeCultivationVO result = new SrLightConeCultivationVO();
 
@@ -135,8 +140,11 @@ public class SrLightConeCultivationServiceImpl implements ISrLightConeCultivatio
 
         // 计算总体材料消耗
         Map<Long, Long> totalMaterialMap = new HashMap<>();
+        // 未完成材料绑定的光锥不参与养成计算
+        Set<Long> usableLightConeIds = usableChecker.getUsableLightconeIds();
         for (SrUserLightCone ulc : userLightCones)
         {
+            if (!usableLightConeIds.contains(ulc.getLightConeId())) continue;
             Integer starLevel = ulc.getStarLevel() != null ? ulc.getStarLevel().intValue() : null;
             Integer currentLevel = ulc.getLevel() != null ? ulc.getLevel() : 1;
             Map<Long, Long> lightConeMaterials = calculateMaterialsForLightCone(

@@ -1,11 +1,13 @@
 package com.quico.srhelper.service.impl;
 
 import java.util.List;
+import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.quico.srhelper.mapper.SrUserLightConeMapper;
 import com.quico.srhelper.domain.SrUserLightCone;
 import com.quico.srhelper.service.ISrUserLightConeService;
+import com.quico.srhelper.service.helper.UsableChecker;
 
 /**
  * 用户持有光锥Service实现类
@@ -18,6 +20,9 @@ public class SrUserLightConeServiceImpl implements ISrUserLightConeService
 {
     @Autowired
     private SrUserLightConeMapper srUserLightConeMapper;
+
+    @Autowired
+    private UsableChecker usableChecker;
 
     /**
      * 查询用户持有光锥
@@ -40,7 +45,9 @@ public class SrUserLightConeServiceImpl implements ISrUserLightConeService
     @Override
     public List<SrUserLightCone> selectSrUserLightConeList(SrUserLightCone srUserLightCone)
     {
-        return srUserLightConeMapper.selectSrUserLightConeList(srUserLightCone);
+        List<SrUserLightCone> list = srUserLightConeMapper.selectSrUserLightConeList(srUserLightCone);
+        markUsable(list);
+        return list;
     }
 
     /**
@@ -55,13 +62,33 @@ public class SrUserLightConeServiceImpl implements ISrUserLightConeService
     @Override
     public List<SrUserLightCone> selectByUserIdWithDetails(Long userId, String path, Integer starLevel, String lightConeName)
     {
-        return srUserLightConeMapper.selectByUserIdWithDetails(userId, path, starLevel, lightConeName);
+        List<SrUserLightCone> list = srUserLightConeMapper.selectByUserIdWithDetails(userId, path, starLevel, lightConeName);
+        markUsable(list);
+        return list;
     }
 
     @Override
     public SrUserLightCone selectByIdWithDetails(Long id)
     {
-        return srUserLightConeMapper.selectByIdWithDetails(id);
+        SrUserLightCone lightCone = srUserLightConeMapper.selectByIdWithDetails(id);
+        if (lightCone != null) {
+            lightCone.setUsable(usableChecker.getUsableLightconeIds().contains(lightCone.getLightConeId()));
+        }
+        return lightCone;
+    }
+
+    /**
+     * 按图鉴光锥材料绑定完成度标记可用性（未完成绑定的光锥不可展示与展开业务）
+     */
+    private void markUsable(List<SrUserLightCone> list)
+    {
+        if (list == null || list.isEmpty()) {
+            return;
+        }
+        Set<Long> usableIds = usableChecker.getUsableLightconeIds();
+        for (SrUserLightCone lightCone : list) {
+            lightCone.setUsable(usableIds.contains(lightCone.getLightConeId()));
+        }
     }
 
     /**

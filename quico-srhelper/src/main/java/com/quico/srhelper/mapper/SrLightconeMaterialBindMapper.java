@@ -75,4 +75,11 @@ public interface SrLightconeMaterialBindMapper {
      * @return 结果
      */
     public int updateLightconeName(Long lightconeId, String lightconeName);
+
+    /**
+     * 查询材料绑定完整的光锥ID集合（绑定行数 = 6）
+     *
+     * @return 材料绑定完整的光锥ID集合
+     */
+    List<Long> selectUsableLightconeIds();
 }
