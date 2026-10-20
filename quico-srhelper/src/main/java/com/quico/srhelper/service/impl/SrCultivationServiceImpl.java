@@ -3,6 +3,7 @@ package com.quico.srhelper.service.impl;
 import com.quico.srhelper.domain.enums.AscensionTypeEnum;
 import com.quico.srhelper.domain.enums.CharacterPathEnum;
 import com.quico.srhelper.domain.enums.MaterialSortEnum;
+import com.quico.srhelper.domain.enums.SynthesisStatusEnum;
 import com.quico.srhelper.domain.SrCharacter;
 import com.quico.srhelper.domain.SrCharacterAscensionMaterial;
 import com.quico.srhelper.domain.SrCharacterBonusAbilityMaterial;
@@ -15,6 +16,7 @@ import com.quico.srhelper.domain.vo.SrCharacterCultivationVO;
 import com.quico.srhelper.domain.vo.SrCharacterExpUpgradeVO;
 import com.quico.srhelper.domain.vo.SrCharactersCultivationVO;
 import com.quico.srhelper.domain.vo.SrCultivationCalcVO;
+import com.quico.srhelper.domain.vo.MaterialCalculationResultVO;
 import com.quico.srhelper.mapper.SrCharacterAscensionMaterialMapper;
 import com.quico.srhelper.mapper.SrCharacterBonusAbilityMaterialMapper;
 import com.quico.srhelper.mapper.SrCharacterMapper;
@@ -24,6 +26,7 @@ import com.quico.srhelper.mapper.SrUserCharacterMapper;
 import com.quico.srhelper.mapper.SrUserItemMapper;
 import com.quico.srhelper.service.ISrCharacterExpUpgradeService;
 import com.quico.srhelper.service.ISrCultivationService;
+import com.quico.srhelper.service.helper.MaterialSynthesisCalculator;
 import com.quico.srhelper.service.helper.UsableChecker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -54,6 +57,7 @@ public class SrCultivationServiceImpl implements ISrCultivationService {
     private final SrUserItemMapper userItemMapper;
     private final ISrCharacterExpUpgradeService expUpgradeService;
     private final UsableChecker usableChecker;
+    private final MaterialSynthesisCalculator synthesisCalculator;
     
     private static final Integer MAX_LEVEL = 80;
     private static final Integer MAX_SKILL_LEVEL = 10;
@@ -118,8 +122,12 @@ public class SrCultivationServiceImpl implements ISrCultivationService {
         // 查询用户背包材料
         Map<Long, Long> userItemMap = getUserItemMap(userId);
         
-        // 构建材料需求列表
-        result.setTotalMaterials(buildMaterialList(totalMaterialMap, userItemMap));
+        // 构建材料需求列表（材料元数据一次查出，供列表与合成折算共用）
+        Map<Long, SrItem> itemMap = selectItemsByIds(totalMaterialMap.keySet());
+        List<SrCharacterCultivationVO.MaterialRequirement> totalMaterials = buildMaterialList(totalMaterialMap, userItemMap, itemMap);
+        result.setTotalMaterials(totalMaterials);
+        // 总体维度的合成折算结果（材料列表提供所需量，背包 map 提供全系列持有量）
+        result.setCalculation(synthesisCalculator.calculate(totalMaterials, userItemMap, itemMap));
         
         return result;
     }
@@ -132,6 +140,8 @@ public class SrCultivationServiceImpl implements ISrCultivationService {
         
         // 查询用户背包材料（各角色材料列表共用）
         Map<Long, Long> userItemMap = getUserItemMap(userId);
+        // 同系列材料缓存（各角色共用，避免重复查库）
+        Map<Long, List<SrItem>> seriesCache = new HashMap<>();
         
         List<SrCharactersCultivationVO.CharacterInfo> characters = new ArrayList<>();
         for (CharacterMaterials cm : calculateUserCharacterMaterials(userId, targetLevel)) {
@@ -143,13 +153,29 @@ public class SrCultivationServiceImpl implements ISrCultivationService {
             info.setCurrentLevel(cm.userCharacter.getLevel() != null ? cm.userCharacter.getLevel().intValue() : 1);
             info.setTargetLevel(targetLevel);
             info.setIsMaxLevel(cm.completed);
-            info.setMaterials(buildMaterialList(cm.materials, userItemMap));
+            // 已完成培养：无材料需求，直接标记为已足够，跳过材料与折算计算
+            if (cm.completed) {
+                log.debug("角色{}{}已完成培养，无需材料需求calculateUserCharactersCultivation", info.getUserCharacterId(), info.getCharacterName());
+                info.setMaterials(new ArrayList<>());
+                MaterialCalculationResultVO calculation = new MaterialCalculationResultVO();
+                calculation.setStatus(SynthesisStatusEnum.ENOUGH);
+                calculation.setRequired(new ArrayList<>());
+                info.setCalculation(calculation);
+                characters.add(info);
+                continue;
+            }
+            log.debug("角色{}{}的需计算材料需求", info.getUserCharacterId(), info.getCharacterName());
+            // 材料元数据一次查出，供列表与合成折算共用
+            Map<Long, SrItem> itemMap = selectItemsByIds(cm.materials.keySet());
+            List<SrCharacterCultivationVO.MaterialRequirement> materialList = buildMaterialList(cm.materials, userItemMap, itemMap);
+            info.setMaterials(materialList);
+            // 该角色维度的合成折算结果（seriesCache 跨角色复用，避免重复查库）
+            info.setCalculation(synthesisCalculator.calculate(materialList, userItemMap, itemMap, seriesCache));
             characters.add(info);
         }
         
         SrCharactersCultivationVO result = new SrCharactersCultivationVO();
         result.setCharacters(characters);
-        log.debug("用户{}的养成材料计算结果：{}", userId, result);
         return result;
     }
     
@@ -241,13 +267,27 @@ public class SrCultivationServiceImpl implements ISrCultivationService {
         log.debug("计算角色{}的材料消耗，当前等级：{}，目标等级：{}，消耗={}",
                 uc.getCharacterId(), uc.getLevel(), targetLevel, calc.materials);
         info.setIsMaxLevel(calc.completed);
+        // 已完成培养：无材料需求，直接标记为已足够，跳过材料与折算计算
+        if (calc.completed) {
+            result.setMaterials(new ArrayList<>());
+            MaterialCalculationResultVO calculation = new MaterialCalculationResultVO();
+            calculation.setStatus(SynthesisStatusEnum.ENOUGH);
+            calculation.setRequired(new ArrayList<>());
+            result.setCalculation(calculation);
+            log.debug("角色{}{}已完成培养，无需材料计算", info.getCharacterId(), info.getCharacterName());
+            return result;
+        }
+        log.debug("角色{}{}未完成培养，需要材料计算", info.getCharacterId(), info.getCharacterName());
         
         // 查询用户背包材料
         Map<Long, Long> userItemMap = getUserItemMap(uc.getUserId());
         
-        // 构建材料需求列表
-        List<SrCharacterCultivationVO.MaterialRequirement> materialList = buildMaterialList(calc.materials, userItemMap);
+        // 构建材料需求列表（材料元数据一次查出，供列表与合成折算共用）
+        Map<Long, SrItem> itemMap = selectItemsByIds(calc.materials.keySet());
+        List<SrCharacterCultivationVO.MaterialRequirement> materialList = buildMaterialList(calc.materials, userItemMap, itemMap);
         result.setMaterials(materialList);
+        // 该角色维度的合成折算结果（材料列表提供所需量，背包 map 提供全系列持有量）
+        result.setCalculation(synthesisCalculator.calculate(materialList, userItemMap, itemMap));
         
         return result;
     }
@@ -875,16 +915,14 @@ public class SrCultivationServiceImpl implements ISrCultivationService {
      * - difference（差额）：消耗 - 用户持有数量
      */
     private List<SrCharacterCultivationVO.MaterialRequirement> buildMaterialList(Map<Long, Long> materialMap,
-                                                                                Map<Long, Long> userItemMap) {
+                                                                                Map<Long, Long> userItemMap,
+                                                                                Map<Long, SrItem> itemMap) {
         List<SrCharacterCultivationVO.MaterialRequirement> list = new ArrayList<>();
         if (materialMap == null || materialMap.isEmpty()) {
             return list;
         }
         
         log.debug("构建材料需求列表，材料消耗={}，用户持有材料={}", materialMap, userItemMap);
-        
-        // 收集 itemId 后一次性批量查询，避免逐条查库
-        Map<Long, SrItem> itemMap = selectItemsByIds(materialMap.keySet());
         
         for (Map.Entry<Long, Long> entry : materialMap.entrySet()) {
             SrItem item = itemMap.get(entry.getKey());

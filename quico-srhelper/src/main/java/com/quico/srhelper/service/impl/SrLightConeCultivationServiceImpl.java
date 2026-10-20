@@ -16,6 +16,7 @@ import com.quico.srhelper.mapper.SrLightconeExpUpgradeMapper;
 import com.quico.srhelper.mapper.SrUserItemMapper;
 import com.quico.srhelper.mapper.SrUserLightConeMapper;
 import com.quico.srhelper.service.ISrLightConeCultivationService;
+import com.quico.srhelper.service.helper.MaterialSynthesisCalculator;
 import com.quico.srhelper.service.helper.UsableChecker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,6 +47,7 @@ public class SrLightConeCultivationServiceImpl implements ISrLightConeCultivatio
     private final SrItemMapper itemMapper;
     private final SrUserItemMapper userItemMapper;
     private final UsableChecker usableChecker;
+    private final MaterialSynthesisCalculator synthesisCalculator;
 
     private static final Integer MAX_LEVEL = 80;
 
@@ -110,9 +112,12 @@ public class SrLightConeCultivationServiceImpl implements ISrLightConeCultivatio
         // 查询用户背包材料
         Map<Long, Long> userItemMap = getUserItemMap(ulc.getUserId());
 
-        // 构建材料需求列表
-        List<SrLightConeCultivationVO.MaterialRequirement> materialList = buildMaterialList(materialMap, userItemMap);
+        // 构建材料需求列表（材料元数据一次查出，供列表与合成折算共用）
+        Map<Long, SrItem> itemMap = selectItemsByIds(materialMap.keySet());
+        List<SrLightConeCultivationVO.MaterialRequirement> materialList = buildMaterialList(materialMap, userItemMap, itemMap);
         result.setMaterials(materialList);
+        // 光锥维度的合成折算结果（材料列表提供所需量，背包 map 提供全系列持有量）
+        result.setCalculation(synthesisCalculator.calculate(materialList, userItemMap, itemMap));
 
         // 判断是否已完成培养（无材料需求）
         result.setCompleted(materialList.isEmpty());
@@ -156,9 +161,12 @@ public class SrLightConeCultivationServiceImpl implements ISrLightConeCultivatio
         // 查询用户背包材料
         Map<Long, Long> userItemMap = getUserItemMap(userId);
 
-        // 构建材料需求列表
-        List<SrLightConeCultivationVO.MaterialRequirement> materialList = buildMaterialList(totalMaterialMap, userItemMap);
+        // 构建材料需求列表（材料元数据一次查出，供列表与合成折算共用）
+        Map<Long, SrItem> itemMap = selectItemsByIds(totalMaterialMap.keySet());
+        List<SrLightConeCultivationVO.MaterialRequirement> materialList = buildMaterialList(totalMaterialMap, userItemMap, itemMap);
         result.setMaterials(materialList);
+        // 光锥总体维度的合成折算结果（材料列表提供所需量，背包 map 提供全系列持有量）
+        result.setCalculation(synthesisCalculator.calculate(materialList, userItemMap, itemMap));
 
         // 判断是否已完成培养（所有光锥都满级）
         result.setCompleted(materialList.isEmpty());
@@ -300,16 +308,14 @@ public class SrLightConeCultivationServiceImpl implements ISrLightConeCultivatio
      * - difference（差额）：消耗 - 用户持有数量，不足为0
      */
     private List<SrLightConeCultivationVO.MaterialRequirement> buildMaterialList(Map<Long, Long> materialMap,
-                                                                                 Map<Long, Long> userItemMap)
+                                                                                Map<Long, Long> userItemMap,
+                                                                                Map<Long, SrItem> itemMap)
     {
         List<SrLightConeCultivationVO.MaterialRequirement> materialList = new ArrayList<>();
         if (materialMap == null || materialMap.isEmpty())
         {
             return materialList;
         }
-
-        // 收集 itemId 后一次性批量查询，避免逐条查库
-        Map<Long, SrItem> itemMap = selectItemsByIds(materialMap.keySet());
 
         for (Map.Entry<Long, Long> entry : materialMap.entrySet())
         {

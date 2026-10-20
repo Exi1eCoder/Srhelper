@@ -1,6 +1,7 @@
 package com.quico.srhelper.domain.vo;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.quico.srhelper.domain.contract.MaterialRequirementView;
 import lombok.Data;
 import java.util.List;
 
@@ -21,6 +22,9 @@ public class SrLightConeCultivationVO
 
     /** 是否已完成培养（无材料需求） */
     private Boolean completed;
+
+    /** 材料的合成折算结果（整体状态 + 需刷取材料明细 + 合成方案） */
+    private MaterialCalculationResultVO calculation;
 
     /**
      * 光锥信息
@@ -60,7 +64,7 @@ public class SrLightConeCultivationVO
      * 材料需求
      */
     @Data
-    public static class MaterialRequirement
+    public static class MaterialRequirement implements MaterialRequirementView
     {
         /** 物品ID */
         private Long itemId;

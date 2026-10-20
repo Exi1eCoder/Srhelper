@@ -16,6 +16,9 @@ public class SrCultivationCalcVO {
     /** 总体所需材料 */
     private List<SrCharacterCultivationVO.MaterialRequirement> totalMaterials;
     
+    /** 总体材料的合成折算结果（整体状态 + 需刷取材料明细 + 合成方案） */
+    private MaterialCalculationResultVO calculation;
+    
     /** 已满级角色列表 */
     private List<CharacterInfo> maxLevelCharacters;
     

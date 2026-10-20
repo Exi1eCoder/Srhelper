@@ -1,6 +1,7 @@
 package com.quico.srhelper.domain.vo;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.quico.srhelper.domain.contract.MaterialRequirementView;
 import lombok.Data;
 
 import java.util.List;
@@ -17,6 +18,9 @@ public class SrCharacterCultivationVO {
     /** 该角色所需材料 */
     private List<MaterialRequirement> materials;
     
+    /** 该角色材料的合成折算结果（整体状态 + 需刷取材料明细 + 合成方案） */
+    private MaterialCalculationResultVO calculation;
+    
     /** 角色信息 */
     @Data
     public static class CharacterInfo {
@@ -32,7 +36,7 @@ public class SrCharacterCultivationVO {
     
     /** 材料需求 */
     @Data
-    public static class MaterialRequirement {
+    public static class MaterialRequirement implements MaterialRequirementView {
         private Long itemId;
         private String itemName;
         private String itemImage;
