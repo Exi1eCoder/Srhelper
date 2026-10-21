@@ -146,11 +146,17 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by update_time desc
     </select>
 
-    <!-- 材料绑定完整（行数=8）的角色ID集合 -->
+    <!-- 实装版本不为空并且材料绑定完整（行数=8）的角色ID集合 -->
     <select id="selectUsableCharacterIds" resultType="java.lang.Long">
+        SELECT c.id
+        FROM sr_character c
+        INNER JOIN (
         select character_id
         from sr_character_material_bind
         group by character_id
-        having count(*) = 8
+        having count(*) = 8) b
+        ON c.id = b.character_id
+        WHERE c.release_version IS NOT NULL
+        AND c.release_version != ''
     </select>
 </mapper>

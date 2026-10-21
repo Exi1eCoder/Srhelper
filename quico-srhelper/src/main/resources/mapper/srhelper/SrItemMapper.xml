@@ -144,7 +144,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by star_level
     </select>
 
-    <!-- 高阶素材绑定完整的系列锚点ID集合：二星 CAL/TRA 且同系列同类型共3行 -->
+    <!-- 高阶素材绑定完整的系列锚点ID、实装版本不为空集合：二星 CAL/TRA 且同系列同类型共3行 -->
     <select id="selectCompleteSeriesIds" resultType="java.lang.Long">
         select t.id
         from sr_item t
@@ -152,6 +152,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
           and t.ascension_type in ('CAL', 'TRA')
           and t.series_id is not null
           and t.series_id = t.id
+          and t.release_version is not null
+          and t.release_version != ''
           and (select count(*)
                from sr_item s
                where s.series_id = t.id

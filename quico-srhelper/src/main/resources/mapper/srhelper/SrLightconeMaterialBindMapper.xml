@@ -180,12 +180,18 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         </foreach>
     </delete>
 
-    <!-- 材料绑定完整（行数=6）的光锥ID集合 -->
+    <!-- 实装版本不为空、材料绑定完整（行数=6）的光锥ID集合 -->
     <select id="selectUsableLightconeIds" resultType="java.lang.Long">
+        select l.id
+        from sr_lightcone l
+        INNER JOIN(
         select lightcone_id
         from sr_lightcone_material_bind
         group by lightcone_id
-        having count(*) = 6
+        having count(*) = 6) m
+        on l.id = m.lightcone_id
+        where l.release_version is not null
+        and l.release_version != ''
     </select>
 
 </mapper>

@@ -43,6 +43,7 @@ import com.quico.srhelper.service.helper.MaterialBindExpander;
 import com.quico.srhelper.service.helper.UsableChecker;
 import com.quico.srhelper.service.ISrCharacterExpUpgradeService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import com.quico.srhelper.service.ISrCharacterService;
 import org.springframework.transaction.annotation.Transactional;
@@ -162,7 +163,16 @@ public class SrCharacterServiceImpl implements ISrCharacterService
     @Override
     public int insertSrCharacter(SrCharacter srCharacter)
     {
-        int result = srCharacterMapper.insertSrCharacter(srCharacter);
+        int result;
+        try
+        {
+            result = srCharacterMapper.insertSrCharacter(srCharacter);
+        }
+        catch (DuplicateKeyException e)
+        {
+            // uk_name_version 唯一键冲突：同名同版本角色已存在
+            throw BusinessException.unprocessable("创建失败，该角色（同名同版本）已存在，请勿重复创建");
+        }
         clearCharacterListCache();
         return result;
     }
@@ -176,8 +186,16 @@ public class SrCharacterServiceImpl implements ISrCharacterService
     @Override
     public int updateSrCharacter(SrCharacter srCharacter)
     {
-        srCharacter.setUpdateTime(DateUtils.getNowDate());
-        int result = srCharacterMapper.updateSrCharacter(srCharacter);
+        int result;
+        try
+        {
+            result = srCharacterMapper.updateSrCharacter(srCharacter);
+        }
+        catch (DuplicateKeyException e)
+        {
+            // uk_name_version 唯一键冲突：同名同版本角色已存在
+            throw BusinessException.unprocessable("更新失败，该角色（同名同版本）已存在，不允许更新");
+        }
         
         // 应用层同步：更新角色名称到材料绑定表
         materialBindSyncService.syncCharacterName(srCharacter.getId(), srCharacter.getCharacterName());
@@ -234,14 +252,31 @@ public class SrCharacterServiceImpl implements ISrCharacterService
             if (dto.getCharacter().getSortOrder() == null) {
                 dto.getCharacter().setSortOrder(System.currentTimeMillis());
             }
-            srCharacterMapper.insertSrCharacter(dto.getCharacter());
+            try
+            {
+                srCharacterMapper.insertSrCharacter(dto.getCharacter());
+            }
+            catch (DuplicateKeyException e)
+            {
+                // uk_name_version 唯一键冲突：同名同版本角色已存在
+                throw BusinessException.unprocessable("创建失败，该角色（同名同版本）已存在，请勿重复创建");
+            }
             characterId = dto.getCharacter().getId();
         } else {
             characterId = dto.getCharacter().getId();
             dto.getCharacter().setUpdateBy(currentUser);
             log.info("updateBy:{}", currentUser);
             dto.getCharacter().setUpdateTime(now);
-            srCharacterMapper.updateSrCharacter(dto.getCharacter());
+            try
+            {
+                srCharacterMapper.updateSrCharacter(dto.getCharacter());
+            }
+            catch (DuplicateKeyException e)
+            {
+                // uk_name_version 唯一键冲突：同名同版本角色已存在
+                throw BusinessException.unprocessable("更新失败，该角色（同名同版本）已存在，不允许更新");
+            }
+            
             // 应用层同步：更新角色名称到材料绑定表
             materialBindSyncService.syncCharacterName(dto.getCharacter().getId(), dto.getCharacter().getCharacterName());
         }

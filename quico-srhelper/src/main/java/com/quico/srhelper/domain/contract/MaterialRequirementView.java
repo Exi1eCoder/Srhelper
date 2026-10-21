@@ -1,4 +1,4 @@
-package com.quico.srhelper.domain.vo;
+package com.quico.srhelper.domain.contract;
 
 /**
  * 材料需求视图（角色、光锥材料需求列表的统一读取契约）
