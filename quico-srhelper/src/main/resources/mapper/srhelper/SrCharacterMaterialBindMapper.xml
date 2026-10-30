@@ -141,6 +141,33 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where item_id = #{itemId}
     </update>
 
+    <!-- 角色名称与主表不一致的记录（定时同步用，按角色去重） -->
+    <select id="selectNameMismatchedCharacters" resultType="SrCharacterMaterialBind">
+        select distinct c.id as characterId,
+               c.character_name as characterName
+        from sr_character c
+        inner join sr_character_material_bind cmb on cmb.character_id = c.id
+        where not (cmb.character_name <![CDATA[ <=> ]]> c.character_name)
+    </select>
+
+    <!-- 物品信息与主表不一致的记录（定时同步用，按物品去重）
+         除名称外，图片/稀有度/系列ID 也在同步范围内，任一不一致即需更新；
+         系列ID 仅在主表非空时同步，与 updateItemSeriesId 的调用条件保持一致 -->
+    <select id="selectInfoMismatchedItems" resultType="SrItem">
+        select distinct i.id,
+               i.item_name as itemName,
+               i.image as image,
+               i.star_level as starLevel,
+               i.series_id as seriesId
+        from sr_item i
+        inner join sr_character_material_bind cmb on cmb.item_id = i.id
+        where <![CDATA[ not (cmb.item_name <=> i.item_name)
+           or not (cmb.item_image <=> i.image)
+           or not (cmb.rarity_level <=> i.star_level)
+           or (i.series_id is not null and not (cmb.series_id <=> i.series_id))
+           ]]>
+    </select>
+
     <select id="selectAllForSync" resultMap="SrCharacterMaterialBindResult">
         <include refid="selectSrCharacterMaterialBindVo"/>
         order by update_time desc
@@ -158,5 +185,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         ON c.id = b.character_id
         WHERE c.release_version IS NOT NULL
         AND c.release_version != ''
+        AND c.avatar IS NOT NULL
+        AND c.avatar != ''
     </select>
 </mapper>

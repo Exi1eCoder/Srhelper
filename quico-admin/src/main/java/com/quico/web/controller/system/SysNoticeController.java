@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 import com.quico.common.annotation.Log;
+import com.quico.common.annotation.RepeatSubmit;
 import com.quico.common.core.controller.BaseController;
 import com.quico.common.core.domain.AjaxResult;
 import com.quico.common.core.page.TableDataInfo;
@@ -62,6 +63,8 @@ public class SysNoticeController extends BaseController
     /**
      * 新增通知公告
      */
+    // 默认 5000 毫秒（5秒）内，同一个用户不能提交两次完全相同的请求
+    @RepeatSubmit(interval = 5000, message = "通知正在发送中，请勿重复提交")
     @PreAuthorize("@ss.hasPermi('system:notice:add')")
     @Log(title = "通知公告", businessType = BusinessType.INSERT)
     @PostMapping

@@ -192,6 +192,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         on l.id = m.lightcone_id
         where l.release_version is not null
         and l.release_version != ''
+        and l.image is not null
+        and l.image != ''
     </select>
 
 </mapper>

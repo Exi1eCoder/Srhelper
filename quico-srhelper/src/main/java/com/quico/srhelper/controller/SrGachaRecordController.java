@@ -19,19 +19,14 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import com.quico.common.annotation.Log;
-import com.quico.common.constant.HttpStatus;
 import com.quico.common.core.controller.BaseController;
 import com.quico.common.core.domain.AjaxResult;
 import com.quico.common.enums.BusinessType;
-import com.quico.common.exception.BusinessException;
 import com.quico.common.utils.SecurityUtils;
 import com.quico.common.utils.ip.IpUtils;
 import com.quico.srhelper.domain.SrGachaRecord;
 import com.quico.srhelper.domain.dto.GachaImportResult;
-import com.quico.srhelper.exception.UploadValidateException;
-import com.quico.srhelper.service.helper.GachaImportValidator;
 import com.quico.srhelper.service.helper.GachaRecalcService;
-import com.quico.srhelper.service.helper.GachaUploadRiskService;
 import com.quico.srhelper.service.ISrGachaRecordService;
 import com.quico.common.utils.poi.ExcelUtil;
 import com.quico.common.core.page.TableDataInfo;
@@ -54,12 +49,6 @@ public class SrGachaRecordController extends BaseController
 
     @Autowired
     private GachaRecalcService gachaRecalcService;
-
-    @Autowired
-    private GachaImportValidator gachaImportValidator;
-
-    @Autowired
-    private GachaUploadRiskService gachaUploadRiskService;
 
     /**
      * 查询当前用户所有去重uid（游戏账号）
@@ -175,43 +164,11 @@ public class SrGachaRecordController extends BaseController
         String ip = IpUtils.getIpAddr(request);
         Long userId = SecurityUtils.getUserId();
 
-        // 第一层前置拦截：封禁检查直接返回，不落审计、不计数
-        if (gachaUploadRiskService.isIpBanned(ip))
-        {
-            return AjaxResult.error(HttpStatus.FORBIDDEN, GachaUploadRiskService.MSG_IP_BANNED);
-        }
-        if (gachaUploadRiskService.isUserBanned(userId.toString()))
-        {
-            return AjaxResult.error(GachaUploadRiskService.CODE_USER_BANNED, GachaUploadRiskService.MSG_USER_BANNED);
-        }
+        // Controller 只负责接参与调用 Service，封禁、五层校验、风控审计全部下沉
+        GachaImportResult result = srGachaRecordService.importGachaRecordWithRisk(
+                file, updateSupport, userId.toString(), ip);
 
-        try
-        {
-            // 第一层：文件后缀 / 大小 / xlsx 魔数
-            gachaImportValidator.validatePhysical(file);
-            // 第二层：EasyExcel 流式解析 + 空文件/超限/解析异常
-            List<SrGachaRecord> recordList = gachaImportValidator.parse(file);
-            // 第三层：gacha_type 字典白名单
-            gachaImportValidator.validateGachaType(recordList);
-            // 第四层：纯文件级防伪校验（逃生舱可关闭）
-            gachaImportValidator.validateForgery(recordList);
-
-            GachaImportResult result = srGachaRecordService.importGachaRecord(recordList, updateSupport, userId.toString());
-            // 成功即清零失败计数
-            gachaUploadRiskService.clearFailCount(userId.toString(), ip);
-            return AjaxResult.success(result.getMessage(), result);
-        }
-        catch (UploadValidateException e)
-        {
-            // 第五层：审计落库 + 信用分级（>=5 次封禁并抛出伪装成网络超时的 500）
-            return gachaUploadRiskService.handleViolation(e, userId, ip, file);
-        }
-        catch (BusinessException e)
-        {
-            // 系统/业务异常（如字典未配置）转成 HTTP 200 + body code，确保前端能拿到具体提示；
-            // 封禁伪装的 500 是在上面的 catch 块内抛出的，不会被这里捕获，仍返回真正的 HTTP 500。
-            return AjaxResult.error(e.getCode(), e.getMessage());
-        }
+        return AjaxResult.success(result.getMessage(), result);
     }
 
     /**
@@ -233,7 +190,7 @@ public class SrGachaRecordController extends BaseController
 
     /**
      * 手动触发抽卡统计重算（只能重算当前登录用户自己的账号）
-     * 只插队到 pending，不立即执行（凌晨 4 点集中处理）
+     * 只插队到 pending，不立即执行（等下一次定时任务调度）
      */
     @Operation(summary = "手动重算", description = "抽卡统计异常时手动提交重新计算，每天限一次")
     @PreAuthorize("@ss.hasPermi('srhelper:gachaRecord:list')")
@@ -244,7 +201,7 @@ public class SrGachaRecordController extends BaseController
         String status = gachaRecalcService.status(uid);
         if (GachaRecalcService.STATUS_PROCESSING.equals(status))
         {
-            return success("已在重算队列中，将在凌晨 4:00 执行");
+            return success("已在重算队列中，将在下一次定时任务调度时执行");
         }
         String createBy = SecurityUtils.getUserId().toString();
         String err = gachaRecalcService.triggerManual(uid, createBy);
@@ -252,7 +209,7 @@ public class SrGachaRecordController extends BaseController
         {
             return AjaxResult.error(err);
         }
-        return success("已提交重算，将在凌晨 4:00 执行，请次日刷新查看");
+        return success("已提交重算，将在下一次定时任务调度时执行，请稍后刷新查看");
     }
 
     /**

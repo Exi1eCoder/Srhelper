@@ -18,7 +18,6 @@ import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 /**
@@ -38,7 +37,7 @@ import org.springframework.stereotype.Service;
  * @author quico
  */
 @Slf4j
-@Service
+@Service("gachaRecalcTask")
 public class GachaRecalcService
 {
     /** 状态：重算完成 */
@@ -48,7 +47,7 @@ public class GachaRecalcService
     /** 状态：无重算任务 */
     public static final String STATUS_UNKNOWN = "UNKNOWN";
 
-    /** 每轮调度最多处理的 uid 数（凌晨集中处理，上限设大） */
+    /** 每轮调度最多处理的 uid 数（集中处理，上限设大） */
     private static final int BATCH_PER_TICK = 500;
 
     /** running 中超过该时长（分钟）视为卡死 */
@@ -139,7 +138,7 @@ public class GachaRecalcService
 
     /**
      * 手动触发重算（抽卡分析页"重新计算"按钮）
-     * 只负责把 uid 插队到 pending，不立即执行（凌晨 4 点集中处理）
+     * 只负责把 uid 插队到 pending，不立即执行（等下一次定时任务调度）
      * 每天限一次
      *
      * @param uid 游戏账号
@@ -162,21 +161,17 @@ public class GachaRecalcService
         }
         redisTemplate.delete(SrhelperCacheConstants.GACHA_RECALC_DONE_PREFIX + uid);
         redisTemplate.opsForSet().add(SrhelperCacheConstants.GACHA_RECALC_PENDING_KEY, uid);
-        log.info("用户{}手动提交抽卡统计重算，uid={}，将在凌晨 4:00 执行", createBy, uid);
+        log.info("用户{}手动提交抽卡统计重算，uid={}，将在下一次定时任务调度时执行", createBy, uid);
         return null;
     }
 
     /**
      * 定时消费待重算队列
      *
-     * cron 由启动时的 active profile 决定：
-     * - 含 prod：每天凌晨 4 点集中处理（避免白天全表重算占用数据库资源）
-     * - 非 prod：每分钟一次，方便开发阶段快速验证
-     *
-     * 注意用 contains 而非 equals，兼容 prod,druid 这类复合 profile
+     * 不再使用 @Scheduled，调度由 RuoYi 后台定时任务的 sys_job 配置驱动，
+     * 调用目标为 gachaRecalcService.consumePending()
+     * （生产建议每天凌晨 4 点，避免白天全表重算占用数据库资源；开发环境可缩短间隔便于验证）
      */
-    @Scheduled(cron = "#{environment.getProperty('spring.profiles.active', 'dev').contains('prod') ? '0 0 4 * * ?' : '0 */5 * * * ?'}")
-    // @Scheduled(cron = "0 0 4 * * ?")
     public void consumePending()
     {
         try

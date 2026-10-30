@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quico.srhelper.mapper.SrReleaseVersionMapper">
+    
+    <resultMap type="SrReleaseVersion" id="SrReleaseVersionResult">
+        <result property="id"    column="id"    />
+        <result property="majorVersion"    column="major_version"    />
+        <result property="versionCode"    column="version_code"    />
+        <result property="versionName"    column="version_name"    />
+        <result property="image"    column="image"    />
+        <result property="releaseTime"    column="release_time"    />
+        <result property="sortOrder"    column="sort_order"    />
+        <result property="status"    column="status"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"    column="remark"    />
+    </resultMap>
+
+    <sql id="selectSrReleaseVersionVo">
+        select id, major_version, version_code, version_name, image, release_time, sort_order, status, create_by, create_time, update_by, update_time, remark from sr_release_version
+    </sql>
+
+    <select id="selectSrReleaseVersionList" parameterType="SrReleaseVersion" resultMap="SrReleaseVersionResult">
+        <include refid="selectSrReleaseVersionVo"/>
+        <where>  
+            <if test="versionCode != null  and versionCode != ''"> and version_code = #{versionCode}</if>
+        </where>
+        order by release_time desc
+    </select>
+    
+    <select id="selectSrReleaseVersionById" parameterType="Long" resultMap="SrReleaseVersionResult">
+        <include refid="selectSrReleaseVersionVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertSrReleaseVersion" parameterType="SrReleaseVersion" useGeneratedKeys="true" keyProperty="id">
+        insert into sr_release_version
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="majorVersion != null">major_version,</if>
+            <if test="versionCode != null and versionCode != ''">version_code,</if>
+            <if test="versionName != null">version_name,</if>
+            <if test="image != null">image,</if>
+            <if test="releaseTime != null">release_time,</if>
+            <if test="sortOrder != null">sort_order,</if>
+            <if test="status != null">status,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="remark != null">remark,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="majorVersion != null">#{majorVersion},</if>
+            <if test="versionCode != null and versionCode != ''">#{versionCode},</if>
+            <if test="versionName != null">#{versionName},</if>
+            <if test="image != null">#{image},</if>
+            <if test="releaseTime != null">#{releaseTime},</if>
+            <if test="sortOrder != null">#{sortOrder},</if>
+            <if test="status != null">#{status},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="remark != null">#{remark},</if>
+         </trim>
+    </insert>
+
+    <update id="updateSrReleaseVersion" parameterType="SrReleaseVersion">
+        update sr_release_version
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="majorVersion != null">major_version = #{majorVersion},</if>
+            <if test="versionCode != null and versionCode != ''">version_code = #{versionCode},</if>
+            <if test="versionName != null">version_name = #{versionName},</if>
+            <if test="image != null">image = #{image},</if>
+            <if test="releaseTime != null">release_time = #{releaseTime},</if>
+            <if test="sortOrder != null">sort_order = #{sortOrder},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteSrReleaseVersionById" parameterType="Long">
+        delete from sr_release_version where id = #{id}
+    </delete>
+
+    <delete id="deleteSrReleaseVersionByIds" parameterType="String">
+        delete from sr_release_version where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

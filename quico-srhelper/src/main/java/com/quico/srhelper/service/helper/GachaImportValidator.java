@@ -189,6 +189,7 @@ public class GachaImportValidator
         String baseRecordTail = lastTwo(baseRecordId);
         if (!baseUidTail.equals(baseRecordTail))
         {
+            log.warn("首条记录 uid 尾号{}与流水号尾号{}不一致，可能为防伪攻击", baseUidTail, baseRecordTail);
             throw new UploadValidateException(ViolationTypeEnum.UID_MISMATCH_BASE,
                     "首条记录 uid 尾号与流水号尾号不一致");
         }

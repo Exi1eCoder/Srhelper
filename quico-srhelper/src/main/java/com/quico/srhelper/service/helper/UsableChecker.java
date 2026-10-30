@@ -24,7 +24,8 @@ import lombok.RequiredArgsConstructor;
  * 判定口径：
  * 1. 角色可用：sr_character_material_bind 中该 character_id 的绑定行数 = 8
  * 2. 光锥可用：sr_lightcone_material_bind 中该 lightcone_id 的绑定行数 = 6
- * 3. 材料可用：CAL（拟造花萼）/TRA（世界掉落）类型必须属于完整系列
+ * 3. 材料可用：先校验实装信息完整（release_version 与 image 均非空，否则判为未实装）；
+ *    非 CAL/TRA 类型通过该步后即可用；CAL（拟造花萼）/TRA（世界掉落）类型还必须属于完整系列
  *    （series_id 指向的二星锚点行，其同系列同类型行数 = 3）
  *
  * 角色与光锥共用，图鉴/列表接口在缓存构建时用本类标记 usable，计算与库存写入时用本类做兜底校验。
@@ -63,14 +64,19 @@ public class UsableChecker {
     }
 
     /**
-     * 判断单个材料是否可用
-     * 非 CAL/TRA 类型恒可用；CAL/TRA 必须属于完整系列
+     * 判断单个材料是否可用（已实装）
+     * 1. 实装版本或图片缺失，直接判为未实装
+     * 2. 非 CAL/TRA 类型通过第 1 步后恒可用
+     * 3. CAL/TRA 必须属于完整系列
      *
      * @param item             材料
      * @param completeSeriesIds 完整系列锚点ID集合（批量场景由调用方传入，避免逐条查库）
      */
     public boolean isItemUsable(SrItem item, Set<Long> completeSeriesIds) {
         if (item == null) {
+            return false;
+        }
+        if (isBlank(item.getReleaseVersion()) || isBlank(item.getImage())) {
             return false;
         }
         if (!isSeriesAscensionType(item.getAscensionType())) {
@@ -127,6 +133,13 @@ public class UsableChecker {
         String type = ascensionType.toUpperCase();
         return ItemAscensionTypeEnum.TRA.getCode().equals(type)
                 || ItemAscensionTypeEnum.CAL.getCode().equals(type);
+    }
+
+    /**
+     * 实装信息是否缺失（与 selectCompleteSeriesIds 的 release_version/image 非空口径一致）
+     */
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
     }
 
     private Set<Long> toSet(List<Long> ids) {

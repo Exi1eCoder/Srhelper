@@ -2,17 +2,14 @@ package com.quico.srhelper.service.helper;
 
 import java.util.List;
 
-import com.quico.srhelper.domain.SrCharacter;
+import com.quico.srhelper.domain.SrCharacterMaterialBind;
 import com.quico.srhelper.domain.SrItem;
-import com.quico.srhelper.mapper.SrCharacterMapper;
 import com.quico.srhelper.mapper.SrCharacterMaterialBindMapper;
-import com.quico.srhelper.mapper.SrItemMapper;
 import com.quico.srhelper.mapper.SrLightconeMaterialBindMapper;
 
 import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,11 +19,11 @@ import org.springframework.transaction.annotation.Transactional;
  * 
  * 功能：
  * 1. 应用层同步：实时同步角色名称和物品信息
- * 2. 定时任务同步：每天凌晨2点执行兜底同步
+ * 2. 定时任务同步：由后台定时任务 sys_job 每天凌晨 2 点执行兜底同步
  * 3. 手动触发同步：用于修复数据
  */
 @Slf4j
-@Service
+@Service("materialBindSyncTask")
 public class MaterialBindSyncService {
 
     @Autowired
@@ -34,12 +31,6 @@ public class MaterialBindSyncService {
 
     @Autowired
     private SrLightconeMaterialBindMapper lightconeMaterialBindMapper;
-
-    @Autowired
-    private SrCharacterMapper characterMapper;
-
-    @Autowired
-    private SrItemMapper itemMapper;
 
     /**
      * 同步角色名称到材料绑定表（应用层同步）
@@ -99,16 +90,21 @@ public class MaterialBindSyncService {
 
     /**
      * 定时任务：同步所有不一致的数据（兜底保障）
-     * 每天凌晨2点执行一次
+     * 调度由后台定时任务的 sys_job 配置驱动，调用目标为 materialBindSyncTask.syncAllData()
+     * （建议每天凌晨 2 点执行一次）
+     * 先查重再更新：只更新与主表不一致的绑定记录，不做无差别全量更新
      */
-    @Scheduled(cron = "0 0 2 * * ?")
     @Transactional(rollbackFor = Exception.class)
     public void syncAllData() {
         log.info("开始执行材料绑定表同步任务...");
         long startTime = System.currentTimeMillis();
 
-        int characterSyncCount = syncAllCharacters();
-        int itemSyncCount = syncAllItems();
+        int characterSyncCount = syncMismatchedCharacters();
+        int itemSyncCount = syncMismatchedItems();
+        if (characterSyncCount == 0 && itemSyncCount == 0) {
+            log.info("材料绑定表同步任务完成，未发现不一致数据");
+            return;
+        }
 
         long endTime = System.currentTimeMillis();
         log.info("材料绑定表同步任务完成，同步角色{}个，同步物品{}个，耗时{}ms", 
@@ -116,30 +112,38 @@ public class MaterialBindSyncService {
     }
 
     /**
-     * 同步所有角色数据
+     * 同步角色名称与主表不一致的绑定记录
+     * 先由 SQL 查出不一致的角色（按角色去重），再按角色ID批量更新其全部绑定行
      */
-    private int syncAllCharacters() {
+    private int syncMismatchedCharacters() {
         int count = 0;
         try {
-            List<SrCharacter> characters = characterMapper.selectSrCharacterList(null);
-            for (SrCharacter character : characters) {
-                materialBindMapper.updateCharacterName(character.getId(), character.getCharacterName());
+            List<SrCharacterMaterialBind> mismatched = materialBindMapper.selectNameMismatchedCharacters();
+            if (mismatched == null || mismatched.isEmpty()) {
+                return 0;
+            }
+            for (SrCharacterMaterialBind bind : mismatched) {
+                materialBindMapper.updateCharacterName(bind.getCharacterId(), bind.getCharacterName());
                 count++;
             }
         } catch (Exception e) {
-            log.error("同步所有角色失败", e);
+            log.error("同步不一致的角色名称失败", e);
         }
         return count;
     }
 
     /**
-     * 同步所有物品数据
+     * 同步物品信息与主表不一致的绑定记录
+     * 先由 SQL 查出不一致的物品（按物品去重，名称/图片/稀有度/系列ID 任一不一致），再按物品ID更新
      */
-    private int syncAllItems() {
+    private int syncMismatchedItems() {
         int count = 0;
         try {
-            List<SrItem> items = itemMapper.selectSrItemList(null);
-            for (SrItem item : items) {
+            List<SrItem> mismatched = materialBindMapper.selectInfoMismatchedItems();
+            if (mismatched == null || mismatched.isEmpty()) {
+                return 0;
+            }
+            for (SrItem item : mismatched) {
                 materialBindMapper.updateItemInfo(
                         item.getId(),
                         item.getItemName(),
@@ -152,7 +156,7 @@ public class MaterialBindSyncService {
                 count++;
             }
         } catch (Exception e) {
-            log.error("同步所有物品失败", e);
+            log.error("同步不一致的物品信息失败", e);
         }
         return count;
     }

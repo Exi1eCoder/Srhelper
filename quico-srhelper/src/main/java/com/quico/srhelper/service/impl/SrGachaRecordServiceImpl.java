@@ -6,15 +6,23 @@ import java.util.Set;
 import java.util.HashSet;
 import java.util.stream.Collectors;
 
+import com.quico.common.constant.HttpStatus;
+import com.quico.common.exception.BusinessException;
+import com.quico.common.exception.ServiceException;
 import com.quico.common.utils.DateUtils;
 import com.quico.common.utils.StringUtils;
 import com.quico.srhelper.domain.vo.GachaRecordAnalysisResultVO;
+import com.quico.srhelper.exception.UploadValidateException;
 import lombok.extern.slf4j.Slf4j;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+import com.quico.srhelper.service.helper.GachaImportValidator;
 import com.quico.srhelper.service.helper.GachaRecordImageCacheManager;
+import com.quico.srhelper.service.helper.GachaUploadRiskService;
 import com.quico.srhelper.domain.dto.GachaImportResult;
 import com.quico.srhelper.mapper.SrGachaRecordMapper;
 import com.quico.srhelper.domain.SrGachaRecord;
@@ -41,6 +49,63 @@ public class SrGachaRecordServiceImpl implements ISrGachaRecordService
 
     @Autowired
     private GachaRecalcService gachaRecalcService;
+
+    @Autowired
+    private GachaImportValidator gachaImportValidator;
+
+    @Autowired
+    private GachaUploadRiskService gachaUploadRiskService;
+
+    /**
+     * 自身代理：WithRisk 内部调用带 @Transactional 的入库方法需要经过代理，否则事务不生效
+     */
+    @Autowired
+    @Lazy
+    private ISrGachaRecordService selfProxy;
+
+    /**
+     * 带五层风控的导入
+     */
+    @Override
+    public GachaImportResult importGachaRecordWithRisk(MultipartFile file, boolean updateSupport, String userId, String ip)
+    {
+        // 1. 前置风控拦截：封禁直接抛业务异常，不落审计、不计数
+        if (gachaUploadRiskService.isIpBanned(ip))
+        {
+            throw new ServiceException(GachaUploadRiskService.MSG_IP_BANNED, HttpStatus.FORBIDDEN);
+        }
+        if (gachaUploadRiskService.isUserBanned(userId))
+        {
+            throw new ServiceException(GachaUploadRiskService.MSG_USER_BANNED, GachaUploadRiskService.CODE_USER_BANNED);
+        }
+
+        try
+        {
+            // 2. 五层漏斗校验
+            gachaImportValidator.validatePhysical(file);
+            List<SrGachaRecord> recordList = gachaImportValidator.parse(file);
+            gachaImportValidator.validateGachaType(recordList);
+            gachaImportValidator.validateForgery(recordList);
+
+            // 3. 核心业务入库（走代理，保证 @Transactional 生效）
+            GachaImportResult result = selfProxy.importGachaRecord(recordList, updateSupport, userId);
+
+            // 4. 成功清理失败计数
+            gachaUploadRiskService.clearFailCount(userId, ip);
+            return result;
+        }
+        catch (UploadValidateException e)
+        {
+            // 5. 风控审计与信用分级，handleViolationAsException 内部会抛出对应业务异常
+            gachaUploadRiskService.handleViolationAsException(e, Long.valueOf(userId), ip, file);
+            throw e;
+        }
+        catch (BusinessException e)
+        {
+            // 系统异常（如字典未配置）：转成 HTTP 200 + body code，避免前端按 HTTP 500 吞掉提示
+            throw new ServiceException(e.getMessage(), e.getCode());
+        }
+    }
 
     /**
      * 查询跃迁记录

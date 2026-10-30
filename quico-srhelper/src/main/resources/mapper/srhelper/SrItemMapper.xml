@@ -149,11 +149,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         select t.id
         from sr_item t
         where t.star_level = 2
+          and t.release_version is not null
+          and t.release_version != ''
+          and t.image is not null
+          and t.image != ''
           and t.ascension_type in ('CAL', 'TRA')
           and t.series_id is not null
           and t.series_id = t.id
-          and t.release_version is not null
-          and t.release_version != ''
           and (select count(*)
                from sr_item s
                where s.series_id = t.id

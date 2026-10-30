@@ -60,7 +60,8 @@ public class GlobalExceptionHandler
     @ExceptionHandler(ServiceException.class)
     public AjaxResult handleServiceException(ServiceException e, HttpServletRequest request)
     {
-        log.error(e.getMessage(), e);
+        // 业务异常是用户操作不合规的正常拦截，只记消息、不打印堆栈，避免 error.log 被业务异常淹没
+        log.warn("请求地址'{}',业务异常'{}'", request.getRequestURI(), e.getMessage());
         Integer code = e.getCode();
         return StringUtils.isNotNull(code) ? AjaxResult.error(code, e.getMessage()) : AjaxResult.error(e.getMessage());
     }

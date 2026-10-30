@@ -1,6 +1,7 @@
 package com.quico.srhelper.service;
 
 import java.util.List;
+import org.springframework.web.multipart.MultipartFile;
 import com.quico.srhelper.domain.SrGachaRecord;
 import com.quico.srhelper.domain.dto.GachaImportResult;
 import com.quico.srhelper.domain.vo.GachaRecordAnalysisResultVO;
@@ -70,6 +71,19 @@ public interface ISrGachaRecordService
      * @return 结构化导入结果（含 needRecalc/uid/message）
      */
     public GachaImportResult importGachaRecord(List<SrGachaRecord> list, boolean updateSupport, String operName);
+
+    /**
+     * 带五层风控的导入：封禁拦截 -> 物理校验 -> 解析 -> 字典白名单 -> 防伪 -> 入库 -> 风控审计
+     *
+     * Controller 只负责接参与调用本方法，异常统一交由全局异常处理器封装
+     *
+     * @param file 上传文件
+     * @param updateSupport 是否更新已存在数据
+     * @param userId 当前登录用户ID
+     * @param ip 客户端IP
+     * @return 结构化导入结果
+     */
+    public GachaImportResult importGachaRecordWithRisk(MultipartFile file, boolean updateSupport, String userId, String ip);
 
     /**
      * 抽卡分析：按卡池类型分组返回五星记录

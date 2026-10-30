@@ -2,6 +2,7 @@ package com.quico.srhelper.mapper;
 
 import java.util.List;
 import com.quico.srhelper.domain.SrCharacterMaterialBind;
+import com.quico.srhelper.domain.SrItem;
 
 /**
  * 角色材料绑定Mapper接口
@@ -103,6 +104,22 @@ public interface SrCharacterMaterialBindMapper
      * @return 结果
      */
     public int updateItemSeriesId(Long itemId, Long seriesId);
+
+    /**
+     * 查询角色名称与主表不一致的记录（定时任务精确同步用）
+     * 返回 characterId 与主表最新的 characterName
+     *
+     * @return 需要同步的角色集合
+     */
+    public List<SrCharacterMaterialBind> selectNameMismatchedCharacters();
+
+    /**
+     * 查询物品信息与主表不一致的记录（定时任务精确同步用）
+     * 返回主表最新的 itemName/itemImage/starLevel/seriesId
+     *
+     * @return 需要同步的物品集合
+     */
+    public List<SrItem> selectInfoMismatchedItems();
 
     /**
      * 查询所有需要同步的记录（用于定时任务）

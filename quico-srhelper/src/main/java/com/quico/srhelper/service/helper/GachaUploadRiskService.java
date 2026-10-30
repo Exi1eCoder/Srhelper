@@ -2,9 +2,9 @@ package com.quico.srhelper.service.helper;
 
 import java.util.concurrent.TimeUnit;
 
+import com.quico.common.constant.CacheConstants;
 import com.quico.common.constant.HttpStatus;
-import com.quico.common.core.domain.AjaxResult;
-import com.quico.common.exception.BusinessException;
+import com.quico.common.exception.ServiceException;
 import com.quico.srhelper.constants.SrhelperCacheConstants;
 import com.quico.srhelper.domain.SysUploadViolationLog;
 import com.quico.srhelper.exception.UploadValidateException;
@@ -20,8 +20,9 @@ import org.springframework.web.multipart.MultipartFile;
  *
  * 统一封装 Redis 计数/封禁操作与审计落库：
  * - 真实死因写入 sys_upload_violation_log（前端永远看不到具体原因）
- * - 用户失败次数分级：<=3 提示格式异常，4 次触发须知弹窗，>=5 次封禁 1 天
- * - IP 失败次数 >= 20 封禁 1 天
+ * - 用户失败次数分级：<=3 提示格式异常，4 次触发须知弹窗，>=5 次封禁
+ * - IP 失败次数 >= 20 封禁
+ * - 计数与封禁有效期取系统参数 gacha.upload.risk.ttl.minutes（默认 1440 分钟）
  *
  * @author quico
  */
@@ -40,6 +41,12 @@ public class GachaUploadRiskService
 
     /** error_msg 字段长度上限 */
     private static final int ERROR_MSG_MAX_LENGTH = 500;
+
+    /** 风控计数/封禁有效期系统参数键（单位：分钟） */
+    private static final String CONFIG_RISK_TTL_MINUTES = "gacha.upload.risk.ttl.minutes";
+
+    /** 系统参数缺失或非法时的兜底有效期（24 小时） */
+    private static final long DEFAULT_RISK_TTL_MINUTES = 24 * 60;
 
     /** 40010 数据格式异常 */
     public static final int CODE_DATA_FORMAT_ERROR = 40010;
@@ -90,45 +97,46 @@ public class GachaUploadRiskService
     /**
      * 处理一次上传校验失败
      *
-     * 先落审计日志，再按信用分级决定返回体：
-     * - fails <= 3：40010 数据格式异常
-     * - fails == 4：40013 触发前端用户须知弹窗
-     * - fails >= 5：封禁用户 1 天并抛出 500（伪装网络超时）
+     * 先落审计日志，再按信用分级决定抛出哪个业务异常（由全局异常处理器统一封装为 AjaxResult）：
+     * - IP 失败次数 >= 20：封禁 IP 1 天并抛出 500（伪装网络超时）
+     * - 用户失败次数 <= 3：40010 数据格式异常
+     * - 用户失败次数 == 4：40013 触发前端用户须知弹窗
+     * - 用户失败次数 >= 5：封禁用户 1 天并抛出 500（伪装网络超时）
      *
      * @param e 校验异常（携带真实死因）
      * @param userId 当前登录用户ID
      * @param ip 客户端IP
      * @param file 上传文件（可为 null）
-     * @return 40010 / 40013 的返回体
      */
-    public AjaxResult handleViolation(UploadValidateException e, Long userId, String ip, MultipartFile file)
+    public void handleViolationAsException(UploadValidateException e, Long userId, String ip, MultipartFile file)
     {
         saveViolationLog(e, userId, ip, file);
 
-        long userFails = incrementFail(SrhelperCacheConstants.GACHA_UPLOAD_FAIL_USER_PREFIX + userId);
-        long ipFails = incrementFail(SrhelperCacheConstants.GACHA_UPLOAD_FAIL_IP_PREFIX + ip);
+        long ttlMinutes = riskTtlMinutes();
+        long userFails = incrementFail(SrhelperCacheConstants.GACHA_UPLOAD_FAIL_USER_PREFIX + userId, ttlMinutes);
+        long ipFails = incrementFail(SrhelperCacheConstants.GACHA_UPLOAD_FAIL_IP_PREFIX + ip, ttlMinutes);
 
         if (ipFails >= IP_BAN_FAILS)
         {
-            ban(SrhelperCacheConstants.GACHA_UPLOAD_BAN_IP_PREFIX + ip);
-            log.warn("IP 上传失败次数达到 {} 次，已封禁 1 天，ip={}", ipFails, ip);
+            ban(SrhelperCacheConstants.GACHA_UPLOAD_BAN_IP_PREFIX + ip, ttlMinutes);
+            log.warn("IP 上传失败次数达到 {} 次，已封禁 {} 分钟，ip={}", ipFails, ttlMinutes, ip);
         }
 
         if (userFails >= USER_BAN_FAILS)
         {
-            ban(SrhelperCacheConstants.GACHA_UPLOAD_BAN_USER_PREFIX + userId);
-            log.warn("用户上传失败次数达到 {} 次，已封禁 1 天，userId={}, ip={}, reason={}",
-                    userFails, userId, ip, e.getViolationType());
+            ban(SrhelperCacheConstants.GACHA_UPLOAD_BAN_USER_PREFIX + userId, ttlMinutes);
+            log.warn("用户上传失败次数达到 {} 次，已封禁 {} 分钟，userId={}, ip={}, reason={}",
+                    userFails, ttlMinutes, userId, ip, e.getViolationType());
             // 伪装成网络超时，不暴露封禁
-            throw new BusinessException(HttpStatus.ERROR, MSG_NETWORK_TIMEOUT);
+            throw new ServiceException(MSG_NETWORK_TIMEOUT, HttpStatus.ERROR);
         }
 
         if (userFails == USER_NOTICE_FAILS)
         {
-            return AjaxResult.error(CODE_USER_NOTICE, MSG_USER_NOTICE);
+            throw new ServiceException(MSG_USER_NOTICE, CODE_USER_NOTICE);
         }
 
-        return AjaxResult.error(CODE_DATA_FORMAT_ERROR, MSG_DATA_FORMAT_ERROR);
+        throw new ServiceException(MSG_DATA_FORMAT_ERROR, CODE_DATA_FORMAT_ERROR);
     }
 
     /**
@@ -141,25 +149,51 @@ public class GachaUploadRiskService
     }
 
     /**
-     * 失败计数 +1，首次计数设置 24 小时过期
+     * 失败计数 +1，首次计数按系统参数设置过期时间
      */
-    private long incrementFail(String key)
+    private long incrementFail(String key, long ttlMinutes)
     {
         Long count = redisTemplate.opsForValue().increment(key);
         if (count != null && count == 1L)
         {
-            redisTemplate.expire(key, SrhelperCacheConstants.GACHA_UPLOAD_RISK_TTL_HOURS, TimeUnit.HOURS);
+            redisTemplate.expire(key, ttlMinutes, TimeUnit.MINUTES);
         }
         return count == null ? 0L : count;
     }
 
     /**
-     * 设置 24 小时封禁标记
+     * 设置封禁标记，有效期取系统参数
      */
-    private void ban(String key)
+    private void ban(String key, long ttlMinutes)
     {
-        redisTemplate.opsForValue().set(key, "1",
-                SrhelperCacheConstants.GACHA_UPLOAD_RISK_TTL_HOURS, TimeUnit.HOURS);
+        redisTemplate.opsForValue().set(key, "1", ttlMinutes, TimeUnit.MINUTES);
+    }
+
+    /**
+     * 读取风控计数/封禁有效期（分钟）
+     * 由参数设置维护：sys_config:gacha.upload.risk.ttl.minutes
+     * 读取失败或值非法时回退默认 24 小时，避免风控失效
+     */
+    private long riskTtlMinutes()
+    {
+        try
+        {
+            Object value = redisTemplate.opsForValue().get(CacheConstants.SYS_CONFIG_KEY + CONFIG_RISK_TTL_MINUTES);
+            log.debug("当前系统参数 {} 值：{}分钟", CONFIG_RISK_TTL_MINUTES, value);
+            if (value != null)
+            {
+                long minutes = Long.parseLong(value.toString().trim());
+                if (minutes > 0)
+                {
+                    return minutes;
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            log.warn("读取系统参数 {} 失败，使用默认 {} 分钟", CONFIG_RISK_TTL_MINUTES, DEFAULT_RISK_TTL_MINUTES, e);
+        }
+        return DEFAULT_RISK_TTL_MINUTES;
     }
 
     /**

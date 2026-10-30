@@ -6,22 +6,22 @@ import com.quico.common.utils.StringUtils;
 /**
  * 定时任务调度测试
  * 
- * @author ruoyi
+ * @author quico
  */
-@Component("ryTask")
-public class RyTask
+@Component("qcTask")
+public class QcTask
 {
-    public void ryMultipleParams(String s, Boolean b, Long l, Double d, Integer i)
+    public void qcMultipleParams(String s, Boolean b, Long l, Double d, Integer i)
     {
         System.out.println(StringUtils.format("执行多参方法： 字符串类型{}，布尔类型{}，长整型{}，浮点型{}，整形{}", s, b, l, d, i));
     }
 
-    public void ryParams(String params)
+    public void qcParams(String params)
     {
         System.out.println("执行有参方法：" + params);
     }
 
-    public void ryNoParams()
+    public void qcNoParams()
     {
         System.out.println("执行无参方法");
     }

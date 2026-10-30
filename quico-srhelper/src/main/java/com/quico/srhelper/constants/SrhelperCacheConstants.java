@@ -20,6 +20,9 @@ public class SrhelperCacheConstants {
     /** 物品列表缓存 */
     public static final String ITEM_LIST_KEY = PREFIX + "item_list:";
 
+    /** 游戏版本列表缓存 */
+    public static final String RELEASE_VERSION_LIST_KEY = PREFIX + "release_version_list:";
+
     /** 角色经验升级配置缓存 */
     public static final String CHAR_EXP_UPGRADE_KEY = PREFIX + "exp_upgrade:";
 
@@ -50,20 +53,17 @@ public class SrhelperCacheConstants {
     /** 手动重算当天限流前缀（{uid} 拼尾，当天 24:00 过期） */
     public static final String GACHA_RECALC_MANUAL_PREFIX = PREFIX + "gacha:recalc:manual:";
 
-    /** 抽卡记录上传：用户失败计数前缀（{userId} 拼尾，24 小时过期） */
+    /** 抽卡记录上传：用户失败计数前缀（{userId} 拼尾，有效期见 sys_config:gacha.upload.risk.ttl.minutes） */
     public static final String GACHA_UPLOAD_FAIL_USER_PREFIX = PREFIX + "gacha:upload:fail:user:";
 
-    /** 抽卡记录上传：IP 失败计数前缀（{ip} 拼尾，24 小时过期） */
+    /** 抽卡记录上传：IP 失败计数前缀（{ip} 拼尾，有效期见 sys_config:gacha.upload.risk.ttl.minutes） */
     public static final String GACHA_UPLOAD_FAIL_IP_PREFIX = PREFIX + "gacha:upload:fail:ip:";
 
-    /** 抽卡记录上传：用户封禁标记前缀（{userId} 拼尾，24 小时过期） */
+    /** 抽卡记录上传：用户封禁标记前缀（{userId} 拼尾，有效期见 sys_config:gacha.upload.risk.ttl.minutes） */
     public static final String GACHA_UPLOAD_BAN_USER_PREFIX = PREFIX + "gacha:upload:ban:user:";
 
-    /** 抽卡记录上传：IP 封禁标记前缀（{ip} 拼尾，24 小时过期） */
+    /** 抽卡记录上传：IP 封禁标记前缀（{ip} 拼尾，有效期见 sys_config:gacha.upload.risk.ttl.minutes） */
     public static final String GACHA_UPLOAD_BAN_IP_PREFIX = PREFIX + "gacha:upload:ban:ip:";
-
-    /** 抽卡记录上传风控计数/封禁有效期（小时） */
-    public static final long GACHA_UPLOAD_RISK_TTL_HOURS = 24;
 
     /** 配置类缓存 TTL（代理到 CacheConstants） */
     public static final long TTL_CONFIG = CacheConstants.TTL_CONFIG;
