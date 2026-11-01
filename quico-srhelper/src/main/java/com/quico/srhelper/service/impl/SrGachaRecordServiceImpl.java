@@ -13,6 +13,7 @@ import com.quico.common.utils.DateUtils;
 import com.quico.common.utils.StringUtils;
 import com.quico.srhelper.domain.vo.GachaRecordAnalysisResultVO;
 import com.quico.srhelper.exception.UploadValidateException;
+import com.quico.srhelper.service.helper.GachaRecordImageCacheManager.StandardInfo;
 import lombok.extern.slf4j.Slf4j;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,6 +47,9 @@ public class SrGachaRecordServiceImpl implements ISrGachaRecordService
 
     @Autowired
     private GachaRecordImageCacheManager imageCacheManager;
+
+    /** 存在“歪”概念的卡池类型：限定池 11/12、联动池 21/22 */
+    private static final Set<String> LOST_ENABLED_GACHA_TYPES = new HashSet<>(Arrays.asList("11", "12", "21", "22"));
 
     @Autowired
     private GachaRecalcService gachaRecalcService;
@@ -444,6 +448,7 @@ public class SrGachaRecordServiceImpl implements ISrGachaRecordService
                 item.setPityCount(record.getPityCount());
                 item.setTime(record.getTime());
                 item.setImageUrl(imageCacheManager.getImageUrl(record.getItemType(), record.getItemId()));
+                item.setLost(isLostPull(record));
                 items.add(item);
             }
             vo.setItems(items);
@@ -452,6 +457,30 @@ public class SrGachaRecordServiceImpl implements ISrGachaRecordService
 
         resultVO.setGroups(result);
         return resultVO;
+    }
+
+    /**
+     * 判定单条五星是否“歪”
+     *
+     * 仅限定池（11/12）与联动池（21/22）有歪的概念：
+     * 抽到的是常驻角色（standardType > 0），且抽卡时间不早于其加入常驻池的时间。
+     * 基础常驻（standardType=1）通常没有加入时间，视为一直在常驻池。
+     */
+    private boolean isLostPull(SrGachaRecord record)
+    {
+        if (record == null || record.getGachaType() == null
+                || !LOST_ENABLED_GACHA_TYPES.contains(record.getGachaType()))
+        {
+            return false;
+        }
+        StandardInfo standardInfo = imageCacheManager.getStandardInfo(record.getItemType(), record.getItemId());
+        if (standardInfo == null || standardInfo.getStandardType() == null
+                || standardInfo.getStandardType() <= 0 || record.getTime() == null)
+        {
+            return false;
+        }
+        return standardInfo.getStandardStartTime() == null
+                || !record.getTime().before(standardInfo.getStandardStartTime());
     }
 
     @Override

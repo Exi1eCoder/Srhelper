@@ -1,5 +1,7 @@
 package com.quico.srhelper.domain;
 
+import java.util.Date;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.quico.common.annotation.Excel;
 import com.quico.common.core.domain.BaseEntity;
 import lombok.Builder;
@@ -58,6 +60,15 @@ public class SrCharacter extends BaseEntity
     /** 简介 */
     @Excel(name = "简介")
     private String description;
+
+    /** 常驻类型：0-限定 1-基础常驻 2-星缘相遇（见 StandardType） */
+    @Excel(name = "常驻类型", readConverterExp = "0=限定,1=基础常驻,2=星缘相遇")
+    private Integer standardType;
+
+    /** 加入常驻池的时间（歪判定用：抽卡时间不早于该时间才算歪） */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @Excel(name = "加入常驻池时间", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    private Date standardStartTime;
 
     /** 排序值（新增时自动设时间戳，值越大越靠前） */
     private Long sortOrder;

@@ -22,6 +22,7 @@ import com.quico.srhelper.domain.SrCharacterMaterialBind;
 import com.quico.srhelper.domain.SrCharacterSkillMaterial;
 import com.quico.srhelper.domain.SrCharacterStatBonusMaterial;
 import com.quico.srhelper.domain.SrItem;
+import com.quico.srhelper.domain.SrReleaseVersion;
 import com.quico.srhelper.domain.cache.SrCharacterListCache;
 import com.quico.srhelper.domain.dto.MaterialItemDTO;
 import com.quico.srhelper.domain.dto.SrCharacterAscensionDTO;
@@ -30,6 +31,9 @@ import com.quico.srhelper.domain.dto.SrCharacterSaveDTO;
 import com.quico.srhelper.domain.dto.SrCharacterSkillDTO;
 import com.quico.srhelper.domain.dto.SrCharacterStatBonusDTO;
 import com.quico.srhelper.domain.enums.AscensionSkillTypeEnum;
+import com.quico.srhelper.domain.enums.StandardType;
+import com.quico.srhelper.domain.vo.CelestialCharacterVO;
+import com.quico.srhelper.domain.vo.LimitedCharacterOptionVO;
 import com.quico.srhelper.domain.vo.SrCharacterDetailVO;
 import com.quico.srhelper.mapper.SrCharacterAscensionMaterialMapper;
 import com.quico.srhelper.mapper.SrCharacterBonusAbilityMaterialMapper;
@@ -37,6 +41,7 @@ import com.quico.srhelper.mapper.SrCharacterMapper;
 import com.quico.srhelper.mapper.SrCharacterMaterialBindMapper;
 import com.quico.srhelper.mapper.SrCharacterSkillMaterialMapper;
 import com.quico.srhelper.mapper.SrCharacterStatBonusMaterialMapper;
+import com.quico.srhelper.mapper.SrReleaseVersionMapper;
 import com.quico.srhelper.service.helper.MaterialBindSyncService;
 import com.quico.srhelper.service.helper.AscensionMaterialGenerator;
 import com.quico.srhelper.service.helper.MaterialBindExpander;
@@ -95,6 +100,9 @@ public class SrCharacterServiceImpl implements ISrCharacterService
 
     @Autowired
     private GachaRecordImageCacheManager imageCacheManager;
+
+    @Autowired
+    private SrReleaseVersionMapper srReleaseVersionMapper;
 
     @Autowired
     private RedisTemplate<Object, Object> redisTemplate;
@@ -200,8 +208,66 @@ public class SrCharacterServiceImpl implements ISrCharacterService
         // 应用层同步：更新角色名称到材料绑定表
         materialBindSyncService.syncCharacterName(srCharacter.getId(), srCharacter.getCharacterName());
 
+        // 常驻类型可能随基础信息一起修改，刷新卡池项目缓存（含歪判定所需的常驻信息）
+        imageCacheManager.refresh();
         clearCharacterListCache();
         return result;
+    }
+
+    /**
+     * 批量加入星缘相遇
+     * 版本联动强校验：standard_start_time 取版本表中该版本的实装时间
+     */
+    @Override
+    public int addToCelestialEncounter(Long[] ids, String versionCode)
+    {
+        if (ids == null || ids.length == 0)
+        {
+            throw BusinessException.badRequest("请选择需要加入星缘相遇的角色");
+        }
+        if (StringUtils.isEmpty(versionCode))
+        {
+            throw BusinessException.badRequest("版本号不能为空");
+        }
+
+        SrReleaseVersion version = srReleaseVersionMapper.selectSrReleaseVersionByVersionCode(versionCode.trim());
+        if (version == null)
+        {
+            throw BusinessException.unprocessable("版本不存在：" + versionCode);
+        }
+        if (version.getReleaseTime() == null)
+        {
+            throw BusinessException.unprocessable("版本 " + versionCode + " 尚未配置实装时间，无法加入星缘相遇");
+        }
+
+        int result = srCharacterMapper.batchUpdateStandardType(
+                ids, StandardType.STANDARD_CELESTIAL.getCode(), version.getReleaseTime());
+
+        // 角色列表缓存与卡池物品缓存都依赖常驻类型/加入常驻时间，更新后必须刷新
+        clearCharacterListCache();
+        imageCacheManager.refresh();
+        log.info("批量加入星缘相遇完成，角色数={}，版本={}，实装时间={}", ids.length, versionCode, version.getReleaseTime());
+        return result;
+    }
+
+    /**
+     * 查询已加入星缘相遇的角色列表
+     * 过滤条件固化在 SQL 的 where standard_type = 2 中，避免把全量角色返回给前端过滤
+     */
+    @Override
+    public List<CelestialCharacterVO> selectCelestialCharacterList(String characterName)
+    {
+        return srCharacterMapper.selectCelestialCharacterList(characterName);
+    }
+
+    /**
+     * 查询可作为星缘相遇候选的限定角色
+     * 过滤条件固化在 SQL 的 where standard_type = 0 中
+     */
+    @Override
+    public List<LimitedCharacterOptionVO> selectLimitedCharacterOptions(String characterName)
+    {
+        return srCharacterMapper.selectLimitedCharacterOptions(characterName);
     }
 
     /**
@@ -950,6 +1016,7 @@ public class SrCharacterServiceImpl implements ISrCharacterService
                     && srCharacter.getStarLevel() == null
                     && srCharacter.getGender() == null
                     && StringUtils.isEmpty(srCharacter.getDescription())
-                    && srCharacter.getId() == null);
+                    && srCharacter.getId() == null)
+                    && srCharacter.getStandardType() == null;
     }
 }

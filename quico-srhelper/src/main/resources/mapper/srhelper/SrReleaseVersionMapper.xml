@@ -37,6 +37,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where id = #{id}
     </select>
 
+    <select id="selectSrReleaseVersionByVersionCode" resultMap="SrReleaseVersionResult">
+        <include refid="selectSrReleaseVersionVo"/>
+        where version_code = #{versionCode}
+        limit 1
+    </select>
+
     <insert id="insertSrReleaseVersion" parameterType="SrReleaseVersion" useGeneratedKeys="true" keyProperty="id">
         insert into sr_release_version
         <trim prefix="(" suffix=")" suffixOverrides=",">

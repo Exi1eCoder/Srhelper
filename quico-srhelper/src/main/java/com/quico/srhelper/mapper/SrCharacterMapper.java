@@ -1,7 +1,10 @@
 package com.quico.srhelper.mapper;
 
 import java.util.List;
+import java.util.Date;
 import com.quico.srhelper.domain.SrCharacter;
+import com.quico.srhelper.domain.vo.CelestialCharacterVO;
+import com.quico.srhelper.domain.vo.LimitedCharacterOptionVO;
 import org.apache.ibatis.annotations.Param;
 
 /**
@@ -61,6 +64,34 @@ public interface SrCharacterMapper
      * @return 结果
      */
     public int updateSrCharacter(SrCharacter srCharacter);
+
+    /**
+     * 查询星缘相遇角色列表（SQL 强制 standard_type = 2，禁止全量返回后由前端过滤）
+     *
+     * @param characterName 角色名字（可选，模糊匹配）
+     * @return 星缘相遇角色精简视图
+     */
+    public List<CelestialCharacterVO> selectCelestialCharacterList(@Param("characterName") String characterName);
+
+    /**
+     * 查询可选限定角色下拉选项（SQL 强制 standard_type = 0）
+     *
+     * @param characterName 角色名字（可选，模糊匹配）
+     * @return 限定角色选项
+     */
+    public List<LimitedCharacterOptionVO> selectLimitedCharacterOptions(@Param("characterName") String characterName);
+
+    /**
+     * 批量更新角色常驻类型与加入常驻池时间（星缘相遇用）
+     *
+     * @param ids 角色主键集合
+     * @param standardType 常驻类型（StandardType.code）
+     * @param standardStartTime 加入常驻池时间
+     * @return 结果
+     */
+    public int batchUpdateStandardType(@Param("ids") Long[] ids,
+                                       @Param("standardType") Integer standardType,
+                                       @Param("standardStartTime") Date standardStartTime);
 
     /**
      * 删除角色

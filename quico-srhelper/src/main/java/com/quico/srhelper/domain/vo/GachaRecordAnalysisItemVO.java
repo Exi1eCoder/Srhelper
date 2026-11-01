@@ -28,4 +28,7 @@ public class GachaRecordAnalysisItemVO implements Serializable {
 
     /** 图片URL */
     private String imageUrl;
+
+    /** 是否歪：仅限定池（11/12）与联动池（21/22）的五星有该判定，其它卡池恒为 false */
+    private Boolean lost;
 }

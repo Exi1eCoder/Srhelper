@@ -3,6 +3,8 @@ package com.quico.srhelper.service;
 import java.util.List;
 import com.quico.srhelper.domain.SrCharacter;
 import com.quico.srhelper.domain.dto.SrCharacterSaveDTO;
+import com.quico.srhelper.domain.vo.CelestialCharacterVO;
+import com.quico.srhelper.domain.vo.LimitedCharacterOptionVO;
 import com.quico.srhelper.domain.vo.SrCharacterDetailVO;
 
 /**
@@ -44,6 +46,32 @@ public interface ISrCharacterService
      * @return 结果
      */
     public int updateSrCharacter(SrCharacter srCharacter);
+
+    /**
+     * 批量加入星缘相遇
+     * 版本联动强校验：按版本号查询实装时间，版本不存在或未配置实装时间时抛出业务异常
+     *
+     * @param ids 角色ID集合
+     * @param versionCode 版本号（必填，如 3.2）
+     * @return 更新行数
+     */
+    int addToCelestialEncounter(Long[] ids, String versionCode);
+
+    /**
+     * 查询已加入星缘相遇的角色列表（SQL 强制 standard_type = 2）
+     *
+     * @param characterName 角色名字（可选模糊匹配）
+     * @return 星缘相遇角色精简视图
+     */
+    List<CelestialCharacterVO> selectCelestialCharacterList(String characterName);
+
+    /**
+     * 查询可作为星缘相遇候选的限定角色（SQL 强制 standard_type = 0）
+     *
+     * @param characterName 角色名字（可选模糊匹配）
+     * @return 限定角色下拉选项
+     */
+    List<LimitedCharacterOptionVO> selectLimitedCharacterOptions(String characterName);
 
     /**
      * 批量删除角色

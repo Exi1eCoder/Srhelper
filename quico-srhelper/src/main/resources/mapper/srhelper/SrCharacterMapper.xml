@@ -15,6 +15,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="faction"    column="faction"    />
         <result property="releaseVersion"    column="release_version"    />
         <result property="description"    column="description"    />
+        <result property="standardType"    column="standard_type"    />
+        <result property="standardStartTime"    column="standard_start_time"    />
         <result property="sortOrder"    column="sort_order"    />
         <result property="createBy"    column="create_by"    />
         <result property="createTime"    column="create_time"    />
@@ -24,7 +26,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectSrCharacterVo">
-        select id, character_name, avatar, gender, star_level, combat_types, path, faction, release_version, description, sort_order, create_by, create_time, update_by, update_time, remark from sr_character
+        select id, character_name, avatar, gender, star_level, combat_types, path, faction, release_version, description, standard_type, standard_start_time, sort_order, create_by, create_time, update_by, update_time, remark from sr_character
     </sql>
 
     <select id="selectSrCharacterList" parameterType="SrCharacter" resultMap="SrCharacterResult">
@@ -39,6 +41,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="faction != null  and faction != ''"> and faction = #{faction}</if>
             <if test="releaseVersion != null  and releaseVersion != ''"> and release_version = #{releaseVersion}</if>
             <if test="description != null  and description != ''"> and description = #{description}</if>
+            <if test="standardType != null "> and standard_type = #{standardType}</if>
         </where>
         ORDER BY sort_order DESC
     </select>
@@ -67,6 +70,28 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where character_name = #{characterName}
     </select>
 
+    <!-- 星缘相遇角色列表：SQL 强制过滤 standard_type = 2，不把全量角色丢给前端过滤 -->
+    <select id="selectCelestialCharacterList" resultType="com.quico.srhelper.domain.vo.CelestialCharacterVO">
+        select id, character_name, avatar, standard_start_time
+        from sr_character
+        where standard_type = 2
+        <if test="characterName != null and characterName != ''">
+            and character_name like concat('%', #{characterName}, '%')
+        </if>
+        order by standard_start_time desc, sort_order desc
+    </select>
+
+    <!-- 可选限定角色下拉：SQL 强制过滤 standard_type = 0 -->
+    <select id="selectLimitedCharacterOptions" resultType="com.quico.srhelper.domain.vo.LimitedCharacterOptionVO">
+        select id, character_name, avatar, release_version
+        from sr_character
+        where standard_type = 0
+        <if test="characterName != null and characterName != ''">
+            and character_name like concat('%', #{characterName}, '%')
+        </if>
+        order by sort_order desc
+    </select>
+
     <insert id="insertSrCharacter" parameterType="SrCharacter" useGeneratedKeys="true" keyProperty="id">
         insert into sr_character
         <trim prefix="(" suffix=")" suffixOverrides=",">
@@ -79,6 +104,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="faction != null">faction,</if>
             <if test="releaseVersion != null">release_version,</if>
             <if test="description != null">description,</if>
+            <if test="standardType != null">standard_type,</if>
+            <if test="standardStartTime != null">standard_start_time,</if>
             <if test="sortOrder != null">sort_order,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
@@ -96,6 +123,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="faction != null">#{faction},</if>
             <if test="releaseVersion != null">#{releaseVersion},</if>
             <if test="description != null">#{description},</if>
+            <if test="standardType != null">#{standardType},</if>
+            <if test="standardStartTime != null">#{standardStartTime},</if>
             <if test="sortOrder != null">#{sortOrder},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="createTime != null">#{createTime},</if>
@@ -117,11 +146,25 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="faction != null">faction = #{faction},</if>
             <if test="releaseVersion != null">release_version = #{releaseVersion},</if>
             <if test="description != null">description = #{description},</if>
+            <if test="standardType != null">standard_type = #{standardType},</if>
+            <if test="standardStartTime != null">standard_start_time = #{standardStartTime},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
             <if test="updateTime != null">update_time = #{updateTime},</if>
             <if test="remark != null">remark = #{remark},</if>
         </trim>
         where id = #{id}
+    </update>
+
+    <!-- 批量更新常驻类型与加入常驻池时间（星缘相遇） -->
+    <update id="batchUpdateStandardType">
+        update sr_character
+        set standard_type = #{standardType},
+            standard_start_time = #{standardStartTime},
+            update_time = CURRENT_TIMESTAMP
+        where id in
+        <foreach item="id" collection="ids" open="(" separator="," close=")">
+            #{id}
+        </foreach>
     </update>
 
     <delete id="deleteSrCharacterById" parameterType="Long">
