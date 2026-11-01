@@ -13,7 +13,7 @@ import com.quico.common.utils.DateUtils;
 import com.quico.common.utils.StringUtils;
 import com.quico.srhelper.domain.vo.GachaRecordAnalysisResultVO;
 import com.quico.srhelper.exception.UploadValidateException;
-import com.quico.srhelper.service.helper.GachaRecordImageCacheManager.StandardInfo;
+import com.quico.srhelper.domain.vo.StandardInfoVO;
 import lombok.extern.slf4j.Slf4j;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -473,7 +473,7 @@ public class SrGachaRecordServiceImpl implements ISrGachaRecordService
         {
             return false;
         }
-        StandardInfo standardInfo = imageCacheManager.getStandardInfo(record.getItemType(), record.getItemId());
+        StandardInfoVO standardInfo = imageCacheManager.getStandardInfo(record.getItemType(), record.getItemId());
         if (standardInfo == null || standardInfo.getStandardType() == null
                 || standardInfo.getStandardType() <= 0 || record.getTime() == null)
         {

@@ -1,6 +1,5 @@
 package com.quico.srhelper.service.helper;
 
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
@@ -11,6 +10,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.quico.srhelper.domain.SrCharacter;
 import com.quico.srhelper.domain.SrGachaItem;
 import com.quico.srhelper.domain.SrLightCones;
+import com.quico.srhelper.domain.vo.StandardInfoVO;
 import com.quico.srhelper.mapper.SrCharacterMapper;
 import com.quico.srhelper.mapper.SrGachaItemMapper;
 import com.quico.srhelper.mapper.SrLightConesMapper;
@@ -37,7 +37,7 @@ public class GachaRecordImageCacheManager {
             .build();
 
     /** 卡池物品常驻信息缓存：character:{keyword} -> 常驻类型与加入常驻池时间 */
-    private final Cache<String, StandardInfo> standardCache = Caffeine.newBuilder()
+    private final Cache<String, StandardInfoVO> standardCache = Caffeine.newBuilder()
             .maximumSize(500)
             .build();
 
@@ -57,7 +57,7 @@ public class GachaRecordImageCacheManager {
      * 获取卡池物品的常驻信息（歪判定用）
      * 非角色（如光锥）或未配置常驻类型的物品返回 null
      */
-    public StandardInfo getStandardInfo(String itemType, String itemId) {
+    public StandardInfoVO getStandardInfo(String itemType, String itemId) {
         if (itemType == null || itemId == null) {
             return null;
         }
@@ -69,7 +69,7 @@ public class GachaRecordImageCacheManager {
         Cache<String, String> newCache = Caffeine.newBuilder()
                 .maximumSize(500)
                 .build();
-        Cache<String, StandardInfo> newStandardCache = Caffeine.newBuilder()
+        Cache<String, StandardInfoVO> newStandardCache = Caffeine.newBuilder()
                 .maximumSize(500)
                 .build();
 
@@ -80,11 +80,11 @@ public class GachaRecordImageCacheManager {
                 .collect(Collectors.toMap(SrCharacter::getId, SrCharacter::getAvatar, (a, b) -> a));
 
         // 常驻类型：0-限定 1-基础常驻 2-星缘相遇，只有非限定角色参与歪判定
-        Map<Long, StandardInfo> characterStandardMap = characters
+        Map<Long, StandardInfoVO> characterStandardMap = characters
                 .stream()
                 .filter(c -> c.getStandardType() != null && c.getStandardType() > 0)
                 .collect(Collectors.toMap(SrCharacter::getId,
-                        c -> new StandardInfo(c.getStandardType(), c.getStandardStartTime()), (a, b) -> a));
+                        c -> new StandardInfoVO(c.getStandardType(), c.getStandardStartTime()), (a, b) -> a));
 
         Map<Long, String> lightconeImageMap = srLightConesMapper.selectSrLightConesList(new SrLightCones())
                 .stream()
@@ -108,7 +108,7 @@ public class GachaRecordImageCacheManager {
 
                 if ("character".equals(normalizedType)) {
                     imageUrl = characterAvatarMap.get(srId);
-                    StandardInfo standardInfo = characterStandardMap.get(srId);
+                    StandardInfoVO standardInfo = characterStandardMap.get(srId);
                     if (standardInfo != null) {
                         newStandardCache.put(normalizedType + ":" + item.getKeyword(), standardInfo);
                         standardCount++;
@@ -133,36 +133,11 @@ public class GachaRecordImageCacheManager {
         oldMap.clear();
         imageCache.putAll(newCache.asMap());
 
-        ConcurrentMap<String, StandardInfo> oldStandardMap = standardCache.asMap();
+        ConcurrentMap<String, StandardInfoVO> oldStandardMap = standardCache.asMap();
         oldStandardMap.clear();
         standardCache.putAll(newStandardCache.asMap());
 
         log.info("卡池项目图片缓存刷新完成，加载 {} 条，跳过 {} 条；常驻标记 {} 条", count, skip, standardCount);
-    }
-
-    /**
-     * 卡池物品的常驻信息（歪判定用）
-     */
-    public static class StandardInfo {
-
-        /** 常驻类型：1-基础常驻 2-星缘相遇 */
-        private final Integer standardType;
-
-        /** 加入常驻池时间，为空表示一直在常驻池 */
-        private final Date standardStartTime;
-
-        public StandardInfo(Integer standardType, Date standardStartTime) {
-            this.standardType = standardType;
-            this.standardStartTime = standardStartTime;
-        }
-
-        public Integer getStandardType() {
-            return standardType;
-        }
-
-        public Date getStandardStartTime() {
-            return standardStartTime;
-        }
     }
 
     private String buildKey(String itemType, String itemId) {
