@@ -24,6 +24,7 @@ import com.quico.srhelper.domain.SrCharacterStatBonusMaterial;
 import com.quico.srhelper.domain.SrItem;
 import com.quico.srhelper.domain.SrReleaseVersion;
 import com.quico.srhelper.domain.cache.SrCharacterListCache;
+import com.quico.srhelper.domain.cache.SrCharacterStandardListCache;
 import com.quico.srhelper.domain.dto.MaterialItemDTO;
 import com.quico.srhelper.domain.dto.SrCharacterAscensionDTO;
 import com.quico.srhelper.domain.dto.SrCharacterBonusDTO;
@@ -110,6 +111,9 @@ public class SrCharacterServiceImpl implements ISrCharacterService
     /** 角色列表默认查询缓存 key（无过滤条件时的分页列表） */
     private static final String CHAR_LIST_CACHE_KEY = SrhelperCacheConstants.CHAR_LIST_KEY + "list";
 
+    /** 角色列表默认查询缓存 key（标准角色） */
+    private static final String CHAR_STANDARD_LIST_CACHE_KEY = SrhelperCacheConstants.CHAR_LIST_KEY + "standard";
+
     /**
      * 查询角色
      * 
@@ -131,6 +135,25 @@ public class SrCharacterServiceImpl implements ISrCharacterService
     @Override
     public List<SrCharacter> selectSrCharacterList(SrCharacter srCharacter)
     {
+        // 基础常驻角色（standard_type=1）：独立 key 缓存，缓存为空时查库并回写（TTL=-1，永不过期）
+        if (srCharacter != null
+                && Integer.valueOf(StandardType.STANDARD_BASE.getCode()).equals(srCharacter.getStandardType())
+                && hasNoBusinessFilter(srCharacter))
+        {
+            SrCharacterStandardListCache cached = (SrCharacterStandardListCache) redisTemplate.opsForValue().get(CHAR_STANDARD_LIST_CACHE_KEY);
+            if (cached != null)
+            {
+                log.debug("selectSrCharacterList 命中缓存（标准角色）");
+                // 可用性依赖材料绑定完整度，可能随时变化，命中缓存后重新标记，避免把旧状态永久带出
+                markUsable(cached.getList());
+                return cached.getList();
+            }
+            List<SrCharacter> list = srCharacterMapper.selectSrCharacterList(srCharacter);
+            markUsable(list);
+            // TTL=-1：不设置过期时间（永久缓存），由角色新增/修改/删除时清除 CHAR_LIST_KEY 前缀 key
+            redisTemplate.opsForValue().set(CHAR_STANDARD_LIST_CACHE_KEY, new SrCharacterStandardListCache(list));
+            return list;
+        }
         if (isEmptyQuery(srCharacter))
         {
             SrCharacterListCache cached = (SrCharacterListCache) redisTemplate.opsForValue().get(CHAR_LIST_CACHE_KEY);
@@ -1003,20 +1026,29 @@ public class SrCharacterServiceImpl implements ISrCharacterService
     }
 
     /**
-     * 判断是否为无过滤条件的列表查询（分页参数不影响，只关注业务字段）
+     * 除 standardType 外是否没有任何业务过滤条件（分页参数不影响，只看业务字段）
+     * 常驻角色列表复用固定缓存 key，只有这种查询才允许命中/写入该缓存
+     */
+    private boolean hasNoBusinessFilter(SrCharacter srCharacter)
+    {
+        return srCharacter != null
+                && StringUtils.isEmpty(srCharacter.getCharacterName())
+                && StringUtils.isEmpty(srCharacter.getPath())
+                && StringUtils.isEmpty(srCharacter.getCombatTypes())
+                && StringUtils.isEmpty(srCharacter.getFaction())
+                && StringUtils.isEmpty(srCharacter.getReleaseVersion())
+                && StringUtils.isEmpty(srCharacter.getDescription())
+                && srCharacter.getStarLevel() == null
+                && srCharacter.getGender() == null
+                && srCharacter.getId() == null;
+    }
+
+    /**
+     * 判断是否为无过滤条件的列表查询（连 standardType 也不能带）
      */
     private boolean isEmptyQuery(SrCharacter srCharacter)
     {
         return srCharacter == null
-                || (StringUtils.isEmpty(srCharacter.getCharacterName())
-                    && StringUtils.isEmpty(srCharacter.getPath())
-                    && StringUtils.isEmpty(srCharacter.getCombatTypes())
-                    && StringUtils.isEmpty(srCharacter.getFaction())
-                    && StringUtils.isEmpty(srCharacter.getReleaseVersion())
-                    && srCharacter.getStarLevel() == null
-                    && srCharacter.getGender() == null
-                    && StringUtils.isEmpty(srCharacter.getDescription())
-                    && srCharacter.getId() == null)
-                    && srCharacter.getStandardType() == null;
+                || (hasNoBusinessFilter(srCharacter) && srCharacter.getStandardType() == null);
     }
 }

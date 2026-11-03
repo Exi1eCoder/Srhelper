@@ -7,6 +7,8 @@ import org.springframework.web.multipart.MultipartFile;
 import com.quico.srhelper.domain.SrCharacter;
 import com.quico.srhelper.domain.SrLightCones;
 import com.quico.srhelper.domain.dto.LightConeSaveDTO;
+import com.quico.srhelper.domain.vo.CelestialLightconeVO;
+import com.quico.srhelper.domain.vo.LimitedLightconeOptionVO;
 
 /**
  * 光锥一览Service接口
@@ -92,4 +94,29 @@ public interface ISrLightConesService
      * @return 导入结果消息
      */
      public String importLightCones(List<SrLightCones> list, boolean updateSupport, String operName);
+
+    /**
+     * 批量加入星缘相遇（版本联动：按版本号取实装时间写入加入常驻池时间）
+     *
+     * @param ids 光锥主键集合
+     * @param versionCode 版本号（必填）
+     * @return 更新行数
+     */
+    public int addToCelestialEncounter(Long[] ids, String versionCode);
+
+    /**
+     * 查询已加入星缘相遇的光锥列表（SQL 强制 standard_type = 2）
+     *
+     * @param lightConeName 光锥名称（可选模糊匹配）
+     * @return 星缘相遇光锥精简视图
+     */
+    public List<CelestialLightconeVO> selectCelestialLightconeList(String lightConeName);
+
+    /**
+     * 查询可作为星缘相遇候选的限定光锥（SQL 强制 standard_type = 0）
+     *
+     * @param lightConeName 光锥名称（可选模糊匹配）
+     * @return 限定光锥下拉选项
+     */
+    public List<LimitedLightconeOptionVO> selectLimitedLightconeOptions(String lightConeName);
 }

@@ -18,11 +18,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.quico.srhelper.mapper.SrLightConesMapper;
 import com.quico.srhelper.mapper.SrLightconeMaterialBindMapper;
+import com.quico.srhelper.mapper.SrReleaseVersionMapper;
 import com.quico.srhelper.domain.SrItem;
 import com.quico.srhelper.domain.SrLightCones;
 import com.quico.srhelper.domain.SrLightconeMaterialBind;
+import com.quico.srhelper.domain.SrReleaseVersion;
 import com.quico.srhelper.domain.cache.SrLightConesListCache;
+import com.quico.srhelper.domain.cache.SrLightConesStandardListCache;
 import com.quico.srhelper.domain.dto.LightConeSaveDTO;
+import com.quico.srhelper.domain.enums.StandardType;
+import com.quico.srhelper.domain.vo.CelestialLightconeVO;
+import com.quico.srhelper.domain.vo.LimitedLightconeOptionVO;
 import com.quico.srhelper.service.ISrLightConesService;
 import com.quico.srhelper.service.helper.MaterialBindExpander;
 import com.quico.srhelper.service.helper.UsableChecker;
@@ -50,6 +56,9 @@ public class SrLightConesServiceImpl implements ISrLightConesService
     private SrLightconeMaterialBindMapper materialBindMapper;
 
     @Autowired
+    private SrReleaseVersionMapper srReleaseVersionMapper;
+
+    @Autowired
     private MaterialBindSyncService materialBindSyncService;
 
     @Autowired
@@ -69,6 +78,9 @@ public class SrLightConesServiceImpl implements ISrLightConesService
 
     /** 光锥列表默认查询缓存 key（无过滤条件时的分页列表） */
     private static final String LIGHTCONE_LIST_CACHE_KEY = SrhelperCacheConstants.LIGHTCONE_LIST_KEY + "list";
+
+    /** 常驻光锥列表查询缓存 key */
+    private static final String LIGHTCONE_STANDARD_LIST_CACHE_KEY = SrhelperCacheConstants.LIGHTCONE_LIST_KEY + "standard";
 
     /**
      * 查询光锥一览
@@ -91,6 +103,26 @@ public class SrLightConesServiceImpl implements ISrLightConesService
     @Override
     public List<SrLightCones> selectSrLightConesList(SrLightCones srLightCones)
     {
+        // 基础常驻光锥（standard_type=1）：独立 key 缓存，缓存为空时查库并回写（TTL=-1，永不过期）
+        if (srLightCones != null
+                && Integer.valueOf(StandardType.STANDARD_BASE.getCode()).equals(srLightCones.getStandardType())
+                && hasNoBusinessFilter(srLightCones))
+        {
+            SrLightConesStandardListCache cached = (SrLightConesStandardListCache) redisTemplate.opsForValue().get(LIGHTCONE_STANDARD_LIST_CACHE_KEY);
+            if (cached != null)
+            {
+                log.debug("selectSrLightConesList 命中缓存（标准光锥）");
+                // 可用性依赖材料绑定完整度，可能随时变化，命中缓存后重新标记，避免把旧状态永久带出
+                markUsable(cached.getList());
+                return cached.getList();
+            }
+            List<SrLightCones> list = srLightConesMapper.selectSrLightConesList(srLightCones);
+            markUsable(list);
+            // TTL=-1：不设置过期时间（永久缓存），由光锥新增/修改/删除时清除 LIGHTCONE_LIST_KEY 前缀 key
+            redisTemplate.opsForValue().set(LIGHTCONE_STANDARD_LIST_CACHE_KEY, new SrLightConesStandardListCache(list));
+            return list;
+        }
+
         if (isEmptyQuery(srLightCones))
         {
             SrLightConesListCache cached = (SrLightConesListCache) redisTemplate.opsForValue().get(LIGHTCONE_LIST_CACHE_KEY);
@@ -138,6 +170,8 @@ public class SrLightConesServiceImpl implements ISrLightConesService
         }
         int result = srLightConesMapper.insertSrLightCones(srLightCones);
         clearLightConeListCache();
+        // 常驻类型/图片可能变化，同步刷新卡池物品缓存（歪判定用）
+        imageCacheManager.refresh();
         return result;
     }
 
@@ -153,6 +187,8 @@ public class SrLightConesServiceImpl implements ISrLightConesService
         srLightCones.setUpdateTime(DateUtils.getNowDate());
         int result = srLightConesMapper.updateSrLightCones(srLightCones);
         clearLightConeListCache();
+        // 常驻类型可能被编辑接口改动，同步刷新卡池物品缓存（歪判定用）
+        imageCacheManager.refresh();
         return result;
     }
 
@@ -180,6 +216,59 @@ public class SrLightConesServiceImpl implements ISrLightConesService
     public int deleteSrLightConesById(Long id)
     {
         return srLightConesMapper.deleteSrLightConesById(id);
+    }
+
+    /**
+     * 查询已加入星缘相遇的光锥列表
+     * 过滤条件固化在 SQL 的 where standard_type = 2 中，避免把全量光锥返回给前端过滤
+     */
+    @Override
+    public List<CelestialLightconeVO> selectCelestialLightconeList(String lightConeName)
+    {
+        return srLightConesMapper.selectCelestialLightconeList(lightConeName);
+    }
+
+    /**
+     * 查询可作为星缘相遇候选的限定光锥
+     * 过滤条件固化在 SQL 的 where standard_type = 0 中
+     */
+    @Override
+    public List<LimitedLightconeOptionVO> selectLimitedLightconeOptions(String lightConeName)
+    {
+        return srLightConesMapper.selectLimitedLightconeOptions(lightConeName);
+    }
+
+    /**
+     * 批量加入星缘相遇（版本联动）
+     * 按版本号取实装时间作为加入常驻池时间，更新后刷新卡池物品缓存（歪判定用）
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int addToCelestialEncounter(Long[] ids, String versionCode)
+    {
+        if (ids == null || ids.length == 0)
+        {
+            throw BusinessException.badRequest("请选择需要加入星缘相遇的光锥");
+        }
+        if (StringUtils.isEmpty(versionCode))
+        {
+            throw BusinessException.badRequest("版本号不能为空");
+        }
+        SrReleaseVersion version = srReleaseVersionMapper.selectSrReleaseVersionByVersionCode(versionCode.trim());
+        if (version == null)
+        {
+            throw BusinessException.unprocessable("版本不存在：" + versionCode);
+        }
+        if (version.getReleaseTime() == null)
+        {
+            throw BusinessException.unprocessable("版本 " + versionCode + " 尚未配置实装时间，无法加入星缘相遇");
+        }
+        int result = srLightConesMapper.batchUpdateStandardType(ids,
+                StandardType.STANDARD_CELESTIAL.getCode(), version.getReleaseTime());
+        clearLightConeListCache();
+        imageCacheManager.refresh();
+        log.info("批量加入光锥星缘相遇完成，光锥数={}，版本={}，实装时间={}", ids.length, versionCode, version.getReleaseTime());
+        return result;
     }
 
     /**
@@ -447,18 +536,28 @@ public class SrLightConesServiceImpl implements ISrLightConesService
     }
 
     /**
-     * 判断是否为无过滤条件的列表查询（分页参数不影响，只关注业务字段）
+     * 除 standardType 外是否没有任何业务过滤条件（分页参数不影响，只看业务字段）
+     * 常驻光锥列表复用固定缓存 key，只有这种查询才允许命中/写入该缓存
+     */
+    private boolean hasNoBusinessFilter(SrLightCones srLightCones)
+    {
+        return srLightCones != null
+                && StringUtils.isEmpty(srLightCones.getLightConeName())
+                && StringUtils.isEmpty(srLightCones.getPath())
+                && StringUtils.isEmpty(srLightCones.getTag())
+                && StringUtils.isEmpty(srLightCones.getReleaseVersion())
+                && StringUtils.isEmpty(srLightCones.getDescription())
+                && srLightCones.getStarLevel() == null
+                && srLightCones.getId() == null;
+    }
+
+    /**
+     * 判断是否为无过滤条件的列表查询（连 standardType 也不能带）
      */
     private boolean isEmptyQuery(SrLightCones srLightCones)
     {
         return srLightCones == null
-                || (StringUtils.isEmpty(srLightCones.getLightConeName())
-                    && StringUtils.isEmpty(srLightCones.getPath())
-                    && StringUtils.isEmpty(srLightCones.getTag())
-                    && StringUtils.isEmpty(srLightCones.getReleaseVersion())
-                    && StringUtils.isEmpty(srLightCones.getDescription())
-                    && srLightCones.getStarLevel() == null
-                    && srLightCones.getId() == null);
+                || (hasNoBusinessFilter(srLightCones) && srLightCones.getStandardType() == null);
     }
 
     /**

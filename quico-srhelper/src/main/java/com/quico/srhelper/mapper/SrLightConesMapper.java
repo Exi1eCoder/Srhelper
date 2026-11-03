@@ -1,7 +1,10 @@
 package com.quico.srhelper.mapper;
 
+import java.util.Date;
 import java.util.List;
 import com.quico.srhelper.domain.SrLightCones;
+import com.quico.srhelper.domain.vo.CelestialLightconeVO;
+import com.quico.srhelper.domain.vo.LimitedLightconeOptionVO;
 import org.apache.ibatis.annotations.Param;
 
 /**
@@ -61,6 +64,34 @@ public interface SrLightConesMapper
      * @return 结果
      */
     public int updateSrLightCones(SrLightCones srLightCones);
+
+    /**
+     * 查询星缘相遇光锥列表（SQL 强制 standard_type = 2，禁止全量返回后由前端过滤）
+     *
+     * @param lightConeName 光锥名称（可选，模糊匹配）
+     * @return 星缘相遇光锥精简视图
+     */
+    public List<CelestialLightconeVO> selectCelestialLightconeList(@Param("lightConeName") String lightConeName);
+
+    /**
+     * 查询可选限定光锥下拉选项（SQL 强制 standard_type = 0）
+     *
+     * @param lightConeName 光锥名称（可选，模糊匹配）
+     * @return 限定光锥选项
+     */
+    public List<LimitedLightconeOptionVO> selectLimitedLightconeOptions(@Param("lightConeName") String lightConeName);
+
+    /**
+     * 批量更新光锥常驻类型与加入常驻池时间（版本联动用）
+     *
+     * @param ids 光锥主键集合
+     * @param standardType 常驻类型（StandardType.code）
+     * @param standardStartTime 加入常驻池时间
+     * @return 结果
+     */
+    public int batchUpdateStandardType(@Param("ids") Long[] ids,
+                                       @Param("standardType") Integer standardType,
+                                       @Param("standardStartTime") Date standardStartTime);
 
     /**
      * 删除光锥一览

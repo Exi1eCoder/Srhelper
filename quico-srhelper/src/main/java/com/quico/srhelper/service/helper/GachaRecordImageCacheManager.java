@@ -55,7 +55,7 @@ public class GachaRecordImageCacheManager {
 
     /**
      * 获取卡池物品的常驻信息（歪判定用）
-     * 非角色（如光锥）或未配置常驻类型的物品返回 null
+     * 角色/光锥中未配置常驻类型（standard_type=0）的物品返回 null
      */
     public StandardInfoVO getStandardInfo(String itemType, String itemId) {
         if (itemType == null || itemId == null) {
@@ -86,10 +86,18 @@ public class GachaRecordImageCacheManager {
                 .collect(Collectors.toMap(SrCharacter::getId,
                         c -> new StandardInfoVO(c.getStandardType(), c.getStandardStartTime()), (a, b) -> a));
 
-        Map<Long, String> lightconeImageMap = srLightConesMapper.selectSrLightConesList(new SrLightCones())
+        List<SrLightCones> lightcones = srLightConesMapper.selectSrLightConesList(new SrLightCones());
+        Map<Long, String> lightconeImageMap = lightcones
                 .stream()
                 .filter(l -> l.getImage() != null)
                 .collect(Collectors.toMap(SrLightCones::getId, SrLightCones::getImage, (a, b) -> a));
+
+        // 光锥常驻类型：与角色一致，0-限定 1-基础常驻 2-星缘相遇，只有非限定光锥参与歪判定
+        Map<Long, StandardInfoVO> lightconeStandardMap = lightcones
+                .stream()
+                .filter(l -> l.getStandardType() != null && l.getStandardType() > 0)
+                .collect(Collectors.toMap(SrLightCones::getId,
+                        l -> new StandardInfoVO(l.getStandardType(), l.getStandardStartTime()), (a, b) -> a));
 
         List<SrGachaItem> items = srGachaItemMapper.selectSrGachaItemList(new SrGachaItem());
         int count = 0;
@@ -115,6 +123,11 @@ public class GachaRecordImageCacheManager {
                     }
                 } else if ("lightcone".equals(normalizedType)) {
                     imageUrl = lightconeImageMap.get(srId);
+                    StandardInfoVO standardInfo = lightconeStandardMap.get(srId);
+                    if (standardInfo != null) {
+                        newStandardCache.put(normalizedType + ":" + item.getKeyword(), standardInfo);
+                        standardCount++;
+                    }
                 }
 
                 if (imageUrl != null) {

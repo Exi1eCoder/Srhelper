@@ -463,7 +463,7 @@ public class SrGachaRecordServiceImpl implements ISrGachaRecordService
      * 判定单条五星是否“歪”
      *
      * 仅限定池（11/12）与联动池（21/22）有歪的概念：
-     * 抽到的是常驻角色（standardType > 0），且抽卡时间不早于其加入常驻池的时间。
+     * 抽到的是常驻角色/光锥（standardType > 0），且抽卡时间不早于其加入常驻池的时间。
      * 基础常驻（standardType=1）通常没有加入时间，视为一直在常驻池。
      */
     private boolean isLostPull(SrGachaRecord record)
