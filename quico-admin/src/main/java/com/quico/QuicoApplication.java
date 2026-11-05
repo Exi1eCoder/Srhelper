@@ -9,7 +9,8 @@ import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration;
  * 
  * @author ruoyi
  */
-@SpringBootApplication(exclude = {
+@SpringBootApplication(scanBasePackages = {"com.quico", "com.anji.captcha"}, // 新增：扫描 aj-captcha 的包
+        exclude = {
         DataSourceAutoConfiguration.class,
         com.fhs.trans.config.TransServiceConfig.class
 })

@@ -29,7 +29,7 @@ import com.quico.system.service.ISysUserService;
 /**
  * 个人信息 业务处理
  * 
- * @author ruoyi
+ * @author quico
  */
 @RestController
 @RequestMapping("/system/user/profile")
@@ -50,6 +50,7 @@ public class SysProfileController extends BaseController
         LoginUser loginUser = getLoginUser();
         SysUser user = loginUser.getUser();
         AjaxResult ajax = AjaxResult.success(user);
+        ajax.put("auths", userService.selectAuthUserListByUserId(user.getUserId()));
         ajax.put("roleGroup", userService.selectUserRoleGroup(loginUser.getUsername()));
         ajax.put("postGroup", userService.selectUserPostGroup(loginUser.getUsername()));
         return ajax;

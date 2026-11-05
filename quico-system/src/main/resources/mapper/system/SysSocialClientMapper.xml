@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quico.system.mapper.SysSocialClientMapper">
+    
+    <resultMap type="SysSocialClient" id="SysSocialClientResult">
+        <result property="clientId"    column="client_id"    />
+        <result property="source"    column="source"    />
+        <result property="clientName"    column="client_name"    />
+        <result property="appId"    column="app_id"    />
+        <result property="appSecret"    column="app_secret"    />
+        <result property="redirectUri"    column="redirect_uri"    />
+        <result property="agentId"    column="agent_id"    />
+        <result property="status"    column="status"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"    column="remark"    />
+    </resultMap>
+
+    <sql id="selectSysSocialClientVo">
+        select client_id, source, client_name, app_id, app_secret, redirect_uri, agent_id, status, create_by, create_time, update_by, update_time, remark from sys_social_client
+    </sql>
+
+    <select id="selectSysSocialClientList" parameterType="SysSocialClient" resultMap="SysSocialClientResult">
+        <include refid="selectSysSocialClientVo"/>
+        <where>  
+            <if test="source != null  and source != ''"> and source = #{source}</if>
+            <if test="clientName != null  and clientName != ''"> and client_name like concat('%', #{clientName}, '%')</if>
+            <if test="status != null  and status != ''"> and status = #{status}</if>
+        </where>
+    </select>
+    
+    <select id="selectSysSocialClientByClientId" parameterType="Long" resultMap="SysSocialClientResult">
+        <include refid="selectSysSocialClientVo"/>
+        where client_id = #{clientId}
+    </select>
+
+    <select id="selectSysSocialClientBySource" parameterType="String" resultMap="SysSocialClientResult">
+        <include refid="selectSysSocialClientVo"/>
+        where source = #{source} limit 1
+    </select>
+
+    <select id="checkSourceUnique" parameterType="String" resultMap="SysSocialClientResult">
+        <include refid="selectSysSocialClientVo"/>
+        where source = #{source} limit 1
+    </select>
+
+    <insert id="insertSysSocialClient" parameterType="SysSocialClient" useGeneratedKeys="true" keyProperty="clientId">
+        insert into sys_social_client
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="source != null and source != ''">source,</if>
+            <if test="clientName != null">client_name,</if>
+            <if test="appId != null and appId != ''">app_id,</if>
+            <if test="appSecret != null and appSecret != ''">app_secret,</if>
+            <if test="redirectUri != null">redirect_uri,</if>
+            <if test="agentId != null">agent_id,</if>
+            <if test="status != null">status,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="remark != null">remark,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="source != null and source != ''">#{source},</if>
+            <if test="clientName != null">#{clientName},</if>
+            <if test="appId != null and appId != ''">#{appId},</if>
+            <if test="appSecret != null and appSecret != ''">#{appSecret},</if>
+            <if test="redirectUri != null">#{redirectUri},</if>
+            <if test="agentId != null">#{agentId},</if>
+            <if test="status != null">#{status},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="remark != null">#{remark},</if>
+         </trim>
+    </insert>
+
+    <update id="updateSysSocialClient" parameterType="SysSocialClient">
+        update sys_social_client
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="source != null and source != ''">source = #{source},</if>
+            <if test="clientName != null">client_name = #{clientName},</if>
+            <if test="appId != null and appId != ''">app_id = #{appId},</if>
+            <if test="appSecret != null and appSecret != ''">app_secret = #{appSecret},</if>
+            <if test="redirectUri != null">redirect_uri = #{redirectUri},</if>
+            <if test="agentId != null">agent_id = #{agentId},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where client_id = #{clientId}
+    </update>
+
+    <delete id="deleteSysSocialClientByClientId" parameterType="Long">
+        delete from sys_social_client where client_id = #{clientId}
+    </delete>
+
+    <delete id="deleteSysSocialClientByClientIds" parameterType="String">
+        delete from sys_social_client where client_id in 
+        <foreach item="clientId" collection="array" open="(" separator="," close=")">
+            #{clientId}
+        </foreach>
+    </delete>
+</mapper>

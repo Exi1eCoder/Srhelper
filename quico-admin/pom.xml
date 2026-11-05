@@ -24,6 +24,13 @@
             <optional>true</optional> <!-- 表示依赖不会传递 -->
         </dependency>
 
+        <!-- Lombok -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
         <!-- spring-doc -->
         <dependency>
             <groupId>org.springdoc</groupId>

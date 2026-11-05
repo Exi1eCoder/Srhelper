@@ -47,6 +47,8 @@
         <easyexcel.version>3.3.3</easyexcel.version>
         <transmittable-thread-local.version>2.14.5</transmittable-thread-local.version>
         <ip2region.version>1.7.2</ip2region.version>
+        <just-auth.version>1.16.7</just-auth.version>
+        <captcha.version>1.4.0</captcha.version>
     </properties>
 
     <!-- 依赖声明 -->
@@ -357,7 +359,19 @@
 		        <artifactId>ip2region</artifactId>
                 <version>${ip2region.version}</version>
             </dependency>
+            
+            <dependency>
+                <groupId>me.zhyd.oauth</groupId>
+                <artifactId>JustAuth</artifactId>
+                <version>${just-auth.version}</version>
+            </dependency>
 
+            <!-- 滑块验证码  -->
+            <dependency>
+                <groupId>com.anji-plus</groupId>
+                <artifactId>captcha-spring-boot-starter</artifactId>
+                <version>${captcha.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 

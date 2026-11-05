@@ -4,6 +4,7 @@ import java.util.Date;
 import java.util.List;
 import org.apache.ibatis.annotations.Param;
 import com.quico.common.core.domain.entity.SysUser;
+import com.quico.system.domain.SysAuthUser;
 
 /**
  * 用户表 数据层
@@ -152,4 +153,45 @@ public interface SysUserMapper
      * @return 用户对象列表
      */
     public List<SysUser> selectUserByIds(Long[] userIds);
+
+    /**
+     * 根据用户编号查询授权列表
+     * 
+     * @param userId 用户编号
+     * @return 授权列表
+     */
+    public List<SysAuthUser> selectAuthUserListByUserId(Long userId);
+    
+    /**
+     * 根据uuid查询用户信息
+     *
+     * @param uuid 唯一信息
+     * @return 结果
+     */
+    public SysUser selectAuthUserByUuid(String uuid);
+    
+    /**
+     * 校验source平台是否绑定
+     *
+     * @param userId 用户编号
+     * @param source 绑定平台
+     * @return 结果
+     */
+    public int checkAuthUser(@Param("userId") Long userId, @Param("source") String source);
+
+    /**
+     * 新增第三方授权信息
+     * 
+     * @param authUser 用户信息
+     * @return 结果
+     */
+    public int insertAuthUser(SysAuthUser authUser);
+
+    /**
+     * 根据编号删除第三方授权信息
+     * 
+     * @param authId 授权编号
+     * @return 结果
+     */
+    public int deleteAuthUser(Long authId);
 }

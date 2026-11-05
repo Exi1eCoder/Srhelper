@@ -3,11 +3,12 @@ package com.quico.system.service;
 import java.util.Date;
 import java.util.List;
 import com.quico.common.core.domain.entity.SysUser;
+import com.quico.system.domain.SysAuthUser;
 
 /**
  * 用户 业务层
  * 
- * @author ruoyi
+ * @author quico
  */
 public interface ISysUserService
 {
@@ -214,4 +215,12 @@ public interface ISysUserService
      * @return 结果
      */
     public String importUser(List<SysUser> userList, Boolean isUpdateSupport, String operName);
+
+    /**
+     * 根据用户编号查询授权列表
+     * 
+     * @param userId 用户编号
+     * @return 授权列表
+     */
+    public List<SysAuthUser> selectAuthUserListByUserId(Long userId);
 }
