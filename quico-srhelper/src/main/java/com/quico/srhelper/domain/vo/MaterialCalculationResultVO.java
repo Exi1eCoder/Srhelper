@@ -19,7 +19,7 @@ import lombok.Data;
 @Data
 public class MaterialCalculationResultVO {
 
-    /** 整体状态：完全够 / 通过合成足够 / 合成一部分仍不够 / 需刷取（取全部材料中的最坏情况） */
+    /** 整体状态：完全够 / 通过合成足够 / 合成一部分仍不够 / 需刷取（按是否存在合成方案 + 是否仍需刷取组合判定） */
     private SynthesisStatusEnum status;
 
     /** 折算（合成）后仍需刷取的材料及各自差额；全部满足时为空列表 */
@@ -52,6 +52,9 @@ public class MaterialCalculationResultVO {
 
         /** 需要刷取的差额（折算后仍缺的数量） */
         private Long difference;
+
+        /** 材料类型标记，如 EXP_BOOK 表示经验书缺口 */
+        private String itemType;
     }
 
     /**

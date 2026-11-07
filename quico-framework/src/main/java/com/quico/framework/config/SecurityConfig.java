@@ -99,8 +99,8 @@ public class SecurityConfig
             // 注解标记允许匿名访问的url
             .authorizeHttpRequests((requests) -> {
                 permitAllUrl.getUrls().forEach(url -> requests.requestMatchers(url).permitAll());
-                // 对于登录login 注册register 验证码captchaImage 允许匿名访问
-                requests.requestMatchers("/login", "/register", "/captchaImage").permitAll()
+                // 对于登录login 注册register 验证码captchaImage 微信小程序登录 允许匿名访问
+                requests.requestMatchers("/login", "/register", "/captchaImage", "/system/auth/wechat-mini/**").permitAll()
                     // 静态资源，可匿名访问
                     .requestMatchers(HttpMethod.GET, "/", "/*.html", "/**.html", "/**.css", "/**.js", "/profile/**").permitAll()
                     // 验证码，可匿名访问

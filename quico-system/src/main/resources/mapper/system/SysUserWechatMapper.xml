@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quico.system.mapper.SysUserWechatMapper">
+
+    <resultMap type="SysUserWechat" id="SysUserWechatResult">
+        <id     property="id"         column="id"          />
+        <result property="userId"     column="user_id"     />
+        <result property="appid"      column="appid"       />
+        <result property="openid"     column="openid"      />
+        <result property="unionid"    column="unionid"     />
+        <result property="createTime" column="create_time" />
+        <result property="updateTime" column="update_time" />
+    </resultMap>
+
+    <select id="selectByAppidAndOpenid" resultMap="SysUserWechatResult">
+        select id, user_id, appid, openid, unionid, create_time, update_time
+        from sys_user_wechat
+        where appid = #{appid} and openid = #{openid}
+        limit 1
+    </select>
+
+    <select id="selectByUnionid" resultMap="SysUserWechatResult">
+        select id, user_id, appid, openid, unionid, create_time, update_time
+        from sys_user_wechat
+        where unionid = #{unionid}
+        limit 1
+    </select>
+
+    <insert id="insertUserWechat" parameterType="SysUserWechat" useGeneratedKeys="true" keyProperty="id">
+        insert into sys_user_wechat(user_id, appid, openid, unionid, create_time)
+        values(#{userId}, #{appid}, #{openid}, #{unionid}, sysdate())
+    </insert>
+
+    <update id="updateUnionid">
+        update sys_user_wechat
+        set unionid = #{unionid}, update_time = sysdate()
+        where id = #{id}
+    </update>
+
+</mapper>

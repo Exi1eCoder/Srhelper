@@ -1,5 +1,6 @@
 package com.quico.srhelper.service.impl;
 
+import com.quico.srhelper.constants.ExpBookConstants;
 import com.quico.srhelper.domain.SrItem;
 import com.quico.srhelper.domain.SrLightConeAscension;
 import com.quico.srhelper.domain.SrLightCones;
@@ -8,6 +9,8 @@ import com.quico.srhelper.domain.SrUserItem;
 import com.quico.srhelper.domain.SrUserLightCone;
 import com.quico.srhelper.domain.enums.CommonItemEnum;
 import com.quico.srhelper.domain.enums.MaterialSortEnum;
+import com.quico.srhelper.domain.enums.SynthesisStatusEnum;
+import com.quico.srhelper.domain.vo.MaterialCalculationResultVO;
 import com.quico.srhelper.domain.vo.SrLightConeCultivationVO;
 import com.quico.srhelper.mapper.SrItemMapper;
 import com.quico.srhelper.mapper.SrLightConeAscensionMapper;
@@ -50,9 +53,6 @@ public class SrLightConeCultivationServiceImpl implements ISrLightConeCultivatio
     private final MaterialSynthesisCalculator synthesisCalculator;
 
     private static final Integer MAX_LEVEL = 80;
-
-    /** 光锥升级经验书物品名（升级表直接存储其数量） */
-    private static final String EXP_BOOK_NAME = "稀薄以太";
 
     // 罗马数字映射
     private static final String[] ROMAN_NUMBERS = {"I", "II", "III", "IV", "V"};
@@ -103,24 +103,27 @@ public class SrLightConeCultivationServiceImpl implements ISrLightConeCultivatio
         Integer starLevel = lightCone.getStarLevel() != null ? lightCone.getStarLevel().intValue() : null;
         Integer currentLevel = ulc.getLevel() != null ? ulc.getLevel() : 1;
 
-        // 计算材料消耗（晋升材料 + 升级经验书/信用点，按当前等级过滤）
+        // 计算材料消耗（晋升材料 + 升级经验/信用点，按当前等级过滤）
         List<SrLightconeExpUpgrade> expUpgrades = starLevel != null
                 ? expUpgradeMapper.selectByStarLevel(starLevel) : new ArrayList<>();
-        Map<Long, Long> materialMap = calculateMaterialsForLightCone(
-                ulc.getLightConeId(), currentLevel, targetLevel, expUpgrades, resolveExpBookItemId());
-        log.debug("用户持有id{}的光锥{}材料消耗：{}", ulc.getId(), ulc.getLightConeId(), materialMap);
+        LightConeMaterialCalc calc = calculateMaterialsForLightCone(
+                ulc.getLightConeId(), currentLevel, targetLevel, expUpgrades);
+        log.debug("用户持有id{}的光锥{}材料消耗：{}", ulc.getId(), ulc.getLightConeId(), calc.materials);
         // 查询用户背包材料
         Map<Long, Long> userItemMap = getUserItemMap(ulc.getUserId());
 
         // 构建材料需求列表（材料元数据一次查出，供列表与合成折算共用）
-        Map<Long, SrItem> itemMap = selectItemsByIds(materialMap.keySet());
-        List<SrLightConeCultivationVO.MaterialRequirement> materialList = buildMaterialList(materialMap, userItemMap, itemMap);
+        Map<Long, SrItem> itemMap = selectItemsByIds(calc.materials.keySet());
+        List<SrLightConeCultivationVO.MaterialRequirement> materialList = buildMaterialList(calc.materials, userItemMap, itemMap);
         result.setMaterials(materialList);
         // 光锥维度的合成折算结果（材料列表提供所需量，背包 map 提供全系列持有量）
         result.setCalculation(synthesisCalculator.calculate(materialList, userItemMap, itemMap));
+        // 经验书缺口折算为2星经验书
+        SrItem expBook = itemMapper.selectSrItemById(ExpBookConstants.LIGHT_CONE_2_STAR_ITEM_ID);
+        appendExpBookRequirement(result.getCalculation(), calc.requiredExp, userItemMap, expBook);
 
-        // 判断是否已完成培养（无材料需求）
-        result.setCompleted(materialList.isEmpty());
+        // 判断是否已完成培养（无材料需求且经验书足够）
+        result.setCompleted(materialList.isEmpty() && expBookSufficient(calc.requiredExp, userItemMap));
 
         log.debug("光锥{}养成材料计算结果：{}", ulc.getLightConeId(), result);
         return result;
@@ -141,10 +144,10 @@ public class SrLightConeCultivationServiceImpl implements ISrLightConeCultivatio
 
         // 全量升级配置一次性查出，供各光锥按星级过滤（避免逐个光锥查库）
         List<SrLightconeExpUpgrade> allExpUpgrades = expUpgradeMapper.selectAllOrderByStarAndLevel();
-        Long expItemId = resolveExpBookItemId();
 
         // 计算总体材料消耗
         Map<Long, Long> totalMaterialMap = new HashMap<>();
+        long totalRequiredExp = 0L;
         // 未完成材料绑定的光锥不参与养成计算
         Set<Long> usableLightConeIds = usableChecker.getUsableLightconeIds();
         for (SrUserLightCone ulc : userLightCones)
@@ -152,10 +155,11 @@ public class SrLightConeCultivationServiceImpl implements ISrLightConeCultivatio
             if (!usableLightConeIds.contains(ulc.getLightConeId())) continue;
             Integer starLevel = ulc.getStarLevel() != null ? ulc.getStarLevel().intValue() : null;
             Integer currentLevel = ulc.getLevel() != null ? ulc.getLevel() : 1;
-            Map<Long, Long> lightConeMaterials = calculateMaterialsForLightCone(
+            LightConeMaterialCalc calc = calculateMaterialsForLightCone(
                     ulc.getLightConeId(), currentLevel, targetLevel,
-                    filterExpUpgradesByStar(allExpUpgrades, starLevel), expItemId);
-            lightConeMaterials.forEach((itemId, quantity) -> totalMaterialMap.merge(itemId, quantity, Long::sum));
+                    filterExpUpgradesByStar(allExpUpgrades, starLevel));
+            calc.materials.forEach((itemId, quantity) -> totalMaterialMap.merge(itemId, quantity, Long::sum));
+            totalRequiredExp += calc.requiredExp;
         }
 
         // 查询用户背包材料
@@ -167,9 +171,12 @@ public class SrLightConeCultivationServiceImpl implements ISrLightConeCultivatio
         result.setMaterials(materialList);
         // 光锥总体维度的合成折算结果（材料列表提供所需量，背包 map 提供全系列持有量）
         result.setCalculation(synthesisCalculator.calculate(materialList, userItemMap, itemMap));
+        // 经验书：所有光锥的需求经验先汇总，再统一抵扣一次背包经验
+        SrItem expBook = itemMapper.selectSrItemById(ExpBookConstants.LIGHT_CONE_2_STAR_ITEM_ID);
+        appendExpBookRequirement(result.getCalculation(), totalRequiredExp, userItemMap, expBook);
 
-        // 判断是否已完成培养（所有光锥都满级）
-        result.setCompleted(materialList.isEmpty());
+        // 判断是否已完成培养（所有光锥都满级且经验书足够）
+        result.setCompleted(materialList.isEmpty() && expBookSufficient(totalRequiredExp, userItemMap));
 
         // 设置总体光锥信息（用于前端展示）
         SrLightConeCultivationVO.LightConeInfo totalInfo = new SrLightConeCultivationVO.LightConeInfo();
@@ -184,15 +191,14 @@ public class SrLightConeCultivationServiceImpl implements ISrLightConeCultivatio
     /**
      * 计算单个光锥的材料消耗（按当前等级过滤）
      * - 晋升材料：break_level（20/30/40/50/60/70/80）大于当前等级且不超过目标等级的才需要
-     * - 升级经验：升级表直接存储经验书数量，区间覆盖当前等级之后到目标等级的部分才需要
+     * - 升级经验：升级表存储2星经验书数量，统一按当前等级升至80级累计为原始经验值
      *
      * @param expUpgrades 该光锥星级对应的升级配置
-     * @param expItemId   经验书物品ID，可为 null
      */
-    private Map<Long, Long> calculateMaterialsForLightCone(Long lightConeId, Integer currentLevel, Integer targetLevel,
-                                                           List<SrLightconeExpUpgrade> expUpgrades, Long expItemId)
+    private LightConeMaterialCalc calculateMaterialsForLightCone(Long lightConeId, Integer currentLevel, Integer targetLevel,
+                                                                List<SrLightconeExpUpgrade> expUpgrades)
     {
-        Map<Long, Long> materialMap = new HashMap<>();
+        LightConeMaterialCalc calc = new LightConeMaterialCalc();
 
         // 晋升材料
         List<SrLightConeAscension> ascensions = ascensionMapper.selectSrLightConeAscensionByConeId(lightConeId);
@@ -209,24 +215,33 @@ public class SrLightConeCultivationServiceImpl implements ISrLightConeCultivatio
                 // 突破等级 >= 当前等级 且 未超过目标等级 时需要（80级无突破）
                 if (breakLevel >= currentLevel && breakLevel <= targetLevel && breakLevel < MAX_LEVEL)
                 {
-                    materialMap.merge(ascension.getItemId(), ascension.getQuantity().longValue(), Long::sum);
+                    calc.materials.merge(ascension.getItemId(), ascension.getQuantity().longValue(), Long::sum);
                 }
             }
         }
 
-        // 升级经验书 + 信用点
-        calculateExpMaterials(currentLevel, targetLevel, expUpgrades, expItemId, materialMap);
+        // 升级经验 + 信用点，经验统一按当前等级升至满级（80）统计
+        calculateExpMaterials(currentLevel, MAX_LEVEL, expUpgrades, calc);
 
-        return materialMap;
+        return calc;
     }
 
     /**
-     * 计算升级经验书与信用点消耗
-     * 升级表直接存储经验书（稀薄以太）数量，无需换算
+     * 单个光锥的材料计算结果（内部传递用）
+     */
+    private static class LightConeMaterialCalc
+    {
+        private final Map<Long, Long> materials = new HashMap<>();
+        private long requiredExp = 0L;
+    }
+
+    /**
+     * 计算升级所需经验与信用点消耗
+     * 升级表存储的是2星经验书（稀薄以太）数量，这里换算为原始经验值，由接口层统一抵扣背包后
+     * 折算为2星经验书缺口，高阶经验书不进入材料消耗列表
      */
     private void calculateExpMaterials(Integer currentLevel, Integer targetLevel,
-                                       List<SrLightconeExpUpgrade> expUpgrades, Long expItemId,
-                                       Map<Long, Long> materialMap)
+                                       List<SrLightconeExpUpgrade> expUpgrades, LightConeMaterialCalc calc)
     {
         // 目标等级与当前等级相同，不需要升级经验和信用点
         if (expUpgrades == null || expUpgrades.isEmpty() || currentLevel == null
@@ -243,15 +258,61 @@ public class SrLightConeCultivationServiceImpl implements ISrLightConeCultivatio
             {
                 continue;
             }
-            if (expItemId != null && upgrade.getExpRequired() != null)
+            if (upgrade.getExpRequired() != null)
             {
-                materialMap.merge(expItemId, upgrade.getExpRequired(), Long::sum);
+                // 配置值 = 2星经验书数量，换算为经验值
+                calc.requiredExp += upgrade.getExpRequired() * ExpBookConstants.LIGHT_CONE_2_STAR_EXP;
             }
             if (upgrade.getCreditsRequired() != null)
             {
-                materialMap.merge(CommonItemEnum.CREDIT.getItemId(), upgrade.getCreditsRequired(), Long::sum);
+                calc.materials.merge(CommonItemEnum.CREDIT.getItemId(), upgrade.getCreditsRequired(), Long::sum);
             }
         }
+    }
+
+    /**
+     * 把经验缺口折算为2星经验书，追加到需刷取列表
+     */
+    private void appendExpBookRequirement(MaterialCalculationResultVO calculation, long requiredExp,
+                                          Map<Long, Long> userItemMap, SrItem expBook)
+    {
+        if (calculation == null || requiredExp <= 0L)
+        {
+            return;
+        }
+        long ownedExp = ExpBookConstants.lightConeOwnedExp(userItemMap);
+        long bookCount = ExpBookConstants.shortageBookCount(requiredExp, ownedExp,
+                ExpBookConstants.LIGHT_CONE_2_STAR_EXP);
+        if (bookCount <= 0L)
+        {
+            return;
+        }
+
+        MaterialCalculationResultVO.RequiredItem requiredItem = new MaterialCalculationResultVO.RequiredItem();
+        MaterialCalculationResultVO.ItemInfo itemInfo = new MaterialCalculationResultVO.ItemInfo();
+        itemInfo.setItemId(expBook != null ? expBook.getId() : ExpBookConstants.LIGHT_CONE_2_STAR_ITEM_ID);
+        itemInfo.setItemImage(expBook != null ? expBook.getImage() : null);
+        requiredItem.setItem(itemInfo);
+        requiredItem.setDifference(bookCount);
+        requiredItem.setItemType(ExpBookConstants.ITEM_TYPE_EXP_BOOK);
+
+        if (calculation.getRequired() == null)
+        {
+            calculation.setRequired(new ArrayList<>());
+        }
+        calculation.getRequired().add(requiredItem);
+        // 经验书只能刷取、无法合成，按"追加一项必须刷取的需求"合并整体状态
+        SynthesisStatusEnum status = calculation.getStatus() != null
+                ? calculation.getStatus() : SynthesisStatusEnum.ENOUGH;
+        calculation.setStatus(status.withFarmRequired());
+    }
+
+    /**
+     * 背包经验书是否足够覆盖需求经验
+     */
+    private boolean expBookSufficient(long requiredExp, Map<Long, Long> userItemMap)
+    {
+        return requiredExp <= ExpBookConstants.lightConeOwnedExp(userItemMap);
     }
 
     /**
@@ -272,15 +333,6 @@ public class SrLightConeCultivationServiceImpl implements ISrLightConeCultivatio
             }
         }
         return result;
-    }
-
-    /**
-     * 解析光锥升级经验书（稀薄以太）物品ID
-     */
-    private Long resolveExpBookItemId()
-    {
-        SrItem item = itemMapper.selectSrItemByName(EXP_BOOK_NAME);
-        return item != null ? item.getId() : null;
     }
 
     /**

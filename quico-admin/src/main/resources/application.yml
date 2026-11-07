@@ -36,6 +36,9 @@ logging:
   level:
     com.quico: debug
     org.springframework: warn
+    # 微信SDK日志降级，避免请求参数（临时code）出现在日志中
+    cn.binarywang: warn
+    me.chanjar: warn
 
 # 用户配置
 user:
@@ -82,6 +85,12 @@ aj:
       aes-status: true
       # 滑动干扰项(0/1/2)
       interference-options: 2
+      # 是否开启接口请求频率限制（必须设为 true）
+      req-frequency-limit-enable: true
+      # 频率限制周期（秒）
+      req-get-lock-limit: 5
+      # 在该周期内允许的最大请求次数（5秒内最多拿5次）
+      req-get-lock-seconds: 5
   
 # token配置
 token:
@@ -160,3 +169,13 @@ xss:
   excludes: /system/notice
   # 匹配链接
   urlPatterns: /system/*,/monitor/*,/tool/*
+
+# 微信小程序配置（appid/secret 复用 application-druid.yml 中的 wechat.miniapp 配置）
+wechat:
+  miniapp:
+    # 是否允许首次登录自动创建用户
+    auto-register: true
+    # 自动创建用户的默认部门，0 表示不分配部门
+    default-dept-id: 0
+    # 自动创建用户的默认角色
+    default-role-key: srplayer

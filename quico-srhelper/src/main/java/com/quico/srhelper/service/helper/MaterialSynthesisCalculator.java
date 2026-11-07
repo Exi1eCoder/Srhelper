@@ -27,14 +27,14 @@ import lombok.RequiredArgsConstructor;
  * 按"低阶自身需求优先、富余才能合成高阶"的口径从低阶向高阶逐级累积富余量，
  * 据此判断高阶缺口能否由合成补足。
  *
- * 本计算器按"角色/光锥维度"汇总该单位的全部材料，输出整体状态（取最坏情况）、
+ * 本计算器按"角色/光锥维度"汇总该单位的全部材料，输出整体状态、
  * 折算后仍需刷取的材料及各自差额、以及各目标材料的合成方案列表。
  *
- * 状态口径（枚举声明顺序即严重程度升序，聚合取最坏）：
- * - 完全够（ENOUGH）：持有量已满足自身需求，无需合成；
- * - 通过合成足够（ENOUGH_BY_SYNTHESIS）：自身持有不足，但低阶富余可合成补足；
- * - 合成一部分仍不够（PARTIAL_SYNTHESIS）：低阶仅能补足一部分，仍有缺口需刷取；
- * - 需刷取（NEED_FARM）：低阶不足以合成，缺口全部需刷取。
+ * 整体状态口径（按"是否存在合成方案 + 是否仍需刷取"组合判定，而非取最坏值）：
+ * - 完全够（ENOUGH）：无任何缺口，无需合成、无需刷取；
+ * - 通过合成足够（ENOUGH_BY_SYNTHESIS）：存在合成方案，且合成后无缺口；
+ * - 合成一部分仍不够（PARTIAL_SYNTHESIS）：存在合成方案，但仍有材料需刷取；
+ * - 需刷取（NEED_FARM）：不存在任何合成方案，缺口全部需刷取。
  *
  * @author quico
  */
@@ -71,10 +71,9 @@ public class MaterialSynthesisCalculator {
                                                Map<Long, SrItem> itemMap,
                                                Map<Long, List<SrItem>> seriesCache) {
         MaterialCalculationResultVO result = new MaterialCalculationResultVO();
-        // 聚合起点：无缺口
-        result.setStatus(SynthesisStatusEnum.ENOUGH);
         result.setRequired(new ArrayList<>());
         if (materials == null || materials.isEmpty() || itemMap == null) {
+            result.setStatus(SynthesisStatusEnum.ENOUGH);
             return result;
         }
         if (userItemMap == null) {
@@ -111,13 +110,16 @@ public class MaterialSynthesisCalculator {
             }
         }
 
+        // 是否存在折算后仍必须刷取的缺口（不可合成材料缺口、或可合成材料的缺口）
+        boolean needFarm = false;
+
         // 不可合成的材料：直接按（所需 - 持有）判定，有缺口即计入需刷取清单
         for (Long itemId : plainItemIds) {
             long shortQty = Math.max(materialMap.getOrDefault(itemId, 0L)
                     - userItemMap.getOrDefault(itemId, 0L), 0L);
             if (shortQty > 0) {
                 requiredItems.add(buildRequired(itemMap.get(itemId), shortQty));
-                result.setStatus(worse(result.getStatus(), SynthesisStatusEnum.NEED_FARM));
+                needFarm = true;
             }
         }
 
@@ -125,12 +127,13 @@ public class MaterialSynthesisCalculator {
         for (Long seriesId : seriesIds.keySet()) {
             SeriesOutcome outcome = evaluateSeries(loadSeriesItems(seriesId, seriesCache), materialMap, userItemMap);
             requiredItems.addAll(outcome.requiredItems);
-            result.setStatus(worse(result.getStatus(), outcome.status));
             plans.addAll(outcome.plans);
+            needFarm |= outcome.needFarm;
         }
 
         result.setRequired(requiredItems);
         result.setSynthesis(plans.isEmpty() ? null : plans);
+        result.setStatus(resolveStatus(needFarm, !plans.isEmpty()));
         return result;
     }
 
@@ -178,11 +181,7 @@ public class MaterialSynthesisCalculator {
                 int synthesizeCount = (int) Math.min(Math.max(requiredQty - owned, 0L), producedFromBelow);
                 if (shortQty > 0) {
                     outcome.requiredItems.add(buildRequired(item, shortQty));
-                    outcome.status = worse(outcome.status, synthesizeCount > 0
-                            ? SynthesisStatusEnum.PARTIAL_SYNTHESIS : SynthesisStatusEnum.NEED_FARM);
-                } else {
-                    outcome.status = worse(outcome.status, synthesizeCount > 0
-                            ? SynthesisStatusEnum.ENOUGH_BY_SYNTHESIS : SynthesisStatusEnum.ENOUGH);
+                    outcome.needFarm = true;
                 }
                 if (synthesizeCount > 0 && lowestItem != null) {
                     outcome.plans.add(buildPlan(item, synthesizeCount, lowestItem));
@@ -270,18 +269,25 @@ public class MaterialSynthesisCalculator {
     }
 
     /**
-     * 取两者中更严重者（枚举声明顺序即严重程度升序）
+     * 组合整体状态：
+     * 有合成方案 + 仍需刷取 → PARTIAL_SYNTHESIS；无合成方案 + 仍需刷取 → NEED_FARM；
+     * 有合成方案 + 无缺口 → ENOUGH_BY_SYNTHESIS；无合成方案 + 无缺口 → ENOUGH。
      */
-    private SynthesisStatusEnum worse(SynthesisStatusEnum a, SynthesisStatusEnum b) {
-        return a.ordinal() >= b.ordinal() ? a : b;
+    private SynthesisStatusEnum resolveStatus(boolean needFarm, boolean hasSynthesis) {
+        if (needFarm) {
+            return hasSynthesis
+                    ? SynthesisStatusEnum.PARTIAL_SYNTHESIS : SynthesisStatusEnum.NEED_FARM;
+        }
+        return hasSynthesis
+                ? SynthesisStatusEnum.ENOUGH_BY_SYNTHESIS : SynthesisStatusEnum.ENOUGH;
     }
 
     /**
      * 单个 series 的折算中间结果
      */
     private static class SeriesOutcome {
-        /** 该 series 内最坏状态 */
-        private SynthesisStatusEnum status = SynthesisStatusEnum.ENOUGH;
+        /** 该 series 内折算后是否仍有需刷取缺口 */
+        private boolean needFarm = false;
         /** 该 series 内折算后仍需刷取的材料及差额 */
         private final List<MaterialCalculationResultVO.RequiredItem> requiredItems = new ArrayList<>();
         /** 该 series 产出的合成方案 */

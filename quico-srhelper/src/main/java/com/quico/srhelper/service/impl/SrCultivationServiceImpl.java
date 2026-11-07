@@ -1,5 +1,6 @@
 package com.quico.srhelper.service.impl;
 
+import com.quico.srhelper.constants.ExpBookConstants;
 import com.quico.srhelper.domain.enums.AscensionTypeEnum;
 import com.quico.srhelper.domain.enums.CharacterPathEnum;
 import com.quico.srhelper.domain.enums.MaterialSortEnum;
@@ -62,9 +63,6 @@ public class SrCultivationServiceImpl implements ISrCultivationService {
     private static final Integer MAX_LEVEL = 80;
     private static final Integer MAX_SKILL_LEVEL = 10;
     private static final Integer MAX_BASIC_ATK_LEVEL = 6;
-    private static final Long EXP_PER_BOOK = 1000L; // 每本旅行见闻提供的经验值
-    /** 角色升级实际消耗的经验书物品名（与详情展示用的"经验值"物品解耦） */
-    private static final String EXP_BOOK_NAME = "旅行见闻";
     
     @Override
     public SrCultivationCalcVO calculateTotalCultivation(Long userId, Integer targetLevel) {
@@ -80,6 +78,7 @@ public class SrCultivationServiceImpl implements ISrCultivationService {
         
         // 计算总体材料消耗（按持有角色进度过滤后的消耗）
         Map<Long, Long> totalMaterialMap = new HashMap<>();
+        long totalRequiredExp = 0L;
         
         for (CharacterMaterials cm : calculateUserCharacterMaterials(userId, targetLevel)) {
             // 已完成培养的角色直接返回，不参与材料汇总
@@ -101,6 +100,7 @@ public class SrCultivationServiceImpl implements ISrCultivationService {
                 
                 // 累加到总体材料
                 cm.materials.forEach((k, v) -> totalMaterialMap.merge(k, v, Long::sum));
+                totalRequiredExp += cm.requiredExp;
             }
         }
         
@@ -128,6 +128,9 @@ public class SrCultivationServiceImpl implements ISrCultivationService {
         result.setTotalMaterials(totalMaterials);
         // 总体维度的合成折算结果（材料列表提供所需量，背包 map 提供全系列持有量）
         result.setCalculation(synthesisCalculator.calculate(totalMaterials, userItemMap, itemMap));
+        // 经验书：所有未完成角色的需求经验先汇总，再统一抵扣一次背包经验，避免重复使用同一批书
+        SrItem expBook = itemMapper.selectSrItemById(ExpBookConstants.CHARACTER_2_STAR_ITEM_ID);
+        appendExpBookRequirement(result.getCalculation(), totalRequiredExp, userItemMap, expBook);
         
         return result;
     }
@@ -142,6 +145,8 @@ public class SrCultivationServiceImpl implements ISrCultivationService {
         Map<Long, Long> userItemMap = getUserItemMap(userId);
         // 同系列材料缓存（各角色共用，避免重复查库）
         Map<Long, List<SrItem>> seriesCache = new HashMap<>();
+        // 2星经验书元数据一次查出，各角色共用
+        SrItem expBook = itemMapper.selectSrItemById(ExpBookConstants.CHARACTER_2_STAR_ITEM_ID);
         
         List<SrCharactersCultivationVO.CharacterInfo> characters = new ArrayList<>();
         for (CharacterMaterials cm : calculateUserCharacterMaterials(userId, targetLevel)) {
@@ -171,6 +176,8 @@ public class SrCultivationServiceImpl implements ISrCultivationService {
             info.setMaterials(materialList);
             // 该角色维度的合成折算结果（seriesCache 跨角色复用，避免重复查库）
             info.setCalculation(synthesisCalculator.calculate(materialList, userItemMap, itemMap, seriesCache));
+            // 每个角色按完整背包经验池独立抵扣，缺口折算为2星经验书
+            appendExpBookRequirement(info.getCalculation(), cm.requiredExp, userItemMap, expBook);
             characters.add(info);
         }
         
@@ -212,12 +219,14 @@ public class SrCultivationServiceImpl implements ISrCultivationService {
         private final SrCharacter character;
         private final boolean completed;
         private final Map<Long, Long> materials;
+        private final long requiredExp;
         
         private CharacterMaterials(SrUserCharacter userCharacter, SrCharacter character, MaterialCalc calc) {
             this.userCharacter = userCharacter;
             this.character = character;
             this.completed = calc.completed;
             this.materials = calc.materials;
+            this.requiredExp = calc.requiredExp;
         }
     }
     
@@ -228,6 +237,7 @@ public class SrCultivationServiceImpl implements ISrCultivationService {
      */
     private static class MaterialCalc {
         private boolean completed = false;
+        private long requiredExp = 0L;
         private final Map<Long, Long> materials = new HashMap<>();
     }
     
@@ -288,6 +298,9 @@ public class SrCultivationServiceImpl implements ISrCultivationService {
         result.setMaterials(materialList);
         // 该角色维度的合成折算结果（材料列表提供所需量，背包 map 提供全系列持有量）
         result.setCalculation(synthesisCalculator.calculate(materialList, userItemMap, itemMap));
+        // 经验书缺口折算为2星经验书
+        SrItem expBook = itemMapper.selectSrItemById(ExpBookConstants.CHARACTER_2_STAR_ITEM_ID);
+        appendExpBookRequirement(result.getCalculation(), calc.requiredExp, userItemMap, expBook);
         
         return result;
     }
@@ -330,8 +343,8 @@ public class SrCultivationServiceImpl implements ISrCultivationService {
             }
         }
         
-        // 经验书和信用点按等级差距计算
-        calculateExpMaterials(currentLevel, targetLevel, calc.materials);
+        // 经验书和信用点按等级差距计算，经验书统一按当前等级升至满级（80）统计
+        calculateExpMaterials(currentLevel, MAX_LEVEL, calc);
         
         return calc;
     }
@@ -666,38 +679,66 @@ public class SrCultivationServiceImpl implements ISrCultivationService {
     }
     
     /**
-     * 计算经验书和信用点
+     * 计算升级所需总经验与信用点
+     * 经验书不再直接写入材料消耗列表，而是记录原始经验需求，由接口层统一抵扣背包经验后
+     * 折算为2星经验书缺口，避免高阶经验书出现在材料消耗列表中。
      */
-    private void calculateExpMaterials(Integer currentLevel, Integer targetLevel, Map<Long, Long> materialMap) {
+    private void calculateExpMaterials(Integer currentLevel, Integer targetLevel, MaterialCalc calc) {
         // 目标等级与当前等级相同，不需要升级经验和信用点
         if (currentLevel != null && currentLevel.equals(targetLevel)) {
             log.debug("当前等级与目标等级相同，不需要升级经验和信用点");
             return;
         }
         
-        log.debug("计算经验书和信用点，当前等级：{}，目标等级：{}", currentLevel, targetLevel);
-        // 复用角色经验升级配置的 Redis 缓存获取各等级区间的经验/信用点数值；
-        // 实际消耗的经验书为「旅行见闻」，与配置表中仅作展示的「经验值」物品解耦，这里独立按名称解析
-        SrItem expBook = itemMapper.selectSrItemByName(EXP_BOOK_NAME);
-        Long expBookItemId = expBook != null ? expBook.getId() : null;
+        log.debug("计算升级经验和信用点，当前等级：{}，目标等级：{}", currentLevel, targetLevel);
         List<SrCharacterExpUpgradeVO> expUpgrades = expUpgradeService.selectAllExpUpgrades();
         
         for (SrCharacterExpUpgradeVO upgrade : expUpgrades) {
             // 只计算当前等级之后需要的经验
             if (upgrade.getMinLevel() != null && upgrade.getMaxLevel() != null
                     && upgrade.getMinLevel() >= currentLevel && upgrade.getMaxLevel() <= targetLevel) {
-                if (expBookItemId != null && upgrade.getExpRequired() != null) {
-                    // 将经验值转换为经验书数量（向上取整）
-                    Long expBooks = (upgrade.getExpRequired() + EXP_PER_BOOK - 1) / EXP_PER_BOOK;
-                    materialMap.merge(expBookItemId, expBooks, Long::sum);
-                    log.debug("等级区间 {} → {}：经验书 {} 本，信用点 {}",
-                            upgrade.getMinLevel(), upgrade.getMaxLevel(), expBooks, upgrade.getCreditsRequired());
+                if (upgrade.getExpRequired() != null) {
+                    calc.requiredExp += upgrade.getExpRequired();
                 }
                 if (upgrade.getCreditsItemId() != null && upgrade.getCreditsRequired() != null) {
-                    materialMap.merge(upgrade.getCreditsItemId(), upgrade.getCreditsRequired(), Long::sum);
+                    calc.materials.merge(upgrade.getCreditsItemId(), upgrade.getCreditsRequired(), Long::sum);
                 }
             }
         }
+    }
+
+    /**
+     * 按当前背包经验书总量抵扣后，把剩余经验缺口折算为2星经验书，追加到需刷取列表。
+     * 高阶经验书只参与抵扣、不在结果中展示。
+     */
+    private void appendExpBookRequirement(MaterialCalculationResultVO calculation, long requiredExp,
+                                          Map<Long, Long> userItemMap, SrItem expBook) {
+        if (calculation == null || requiredExp <= 0L) {
+            return;
+        }
+        long ownedExp = ExpBookConstants.characterOwnedExp(userItemMap);
+        long bookCount = ExpBookConstants.shortageBookCount(requiredExp, ownedExp,
+                ExpBookConstants.CHARACTER_2_STAR_EXP);
+        if (bookCount <= 0L) {
+            return;
+        }
+
+        MaterialCalculationResultVO.RequiredItem requiredItem = new MaterialCalculationResultVO.RequiredItem();
+        MaterialCalculationResultVO.ItemInfo itemInfo = new MaterialCalculationResultVO.ItemInfo();
+        itemInfo.setItemId(expBook != null ? expBook.getId() : ExpBookConstants.CHARACTER_2_STAR_ITEM_ID);
+        itemInfo.setItemImage(expBook != null ? expBook.getImage() : null);
+        requiredItem.setItem(itemInfo);
+        requiredItem.setDifference(bookCount);
+        requiredItem.setItemType(ExpBookConstants.ITEM_TYPE_EXP_BOOK);
+
+        if (calculation.getRequired() == null) {
+            calculation.setRequired(new ArrayList<>());
+        }
+        calculation.getRequired().add(requiredItem);
+        // 经验书只能刷取、无法合成，按"追加一项必须刷取的需求"合并整体状态
+        SynthesisStatusEnum status = calculation.getStatus() != null
+                ? calculation.getStatus() : SynthesisStatusEnum.ENOUGH;
+        calculation.setStatus(status.withFarmRequired());
     }
     
     /**

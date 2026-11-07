@@ -36,12 +36,16 @@ public class AjCaptchaController
     private ISysConfigService configService;
 
     /**
-     * 查询滑动验证码是否开启
+     * 查询验证码开关
      */
     @GetMapping("/enabled")
     public AjaxResult enabled()
     {
-        return AjaxResult.success().put("captchaEnabled", ajCaptchaCheckEnabled());
+        // captchaEnabled：图形验证码开关（sys.account.captchaEnabled）
+        // ajCaptchaCheck：滑动验证码开关（sys.account.ajCaptchaCheck）
+        return AjaxResult.success()
+                .put("captchaEnabled", configService.selectCaptchaEnabled())
+                .put("ajCaptchaCheck", ajCaptchaCheckEnabled());
     }
 
     /**
