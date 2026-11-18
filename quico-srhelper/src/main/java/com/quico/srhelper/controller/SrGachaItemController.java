@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.quico.common.annotation.Log;
 import com.quico.common.core.controller.BaseController;
@@ -62,6 +63,17 @@ public class SrGachaItemController extends BaseController
         List<SrGachaItem> list = srGachaItemService.selectSrGachaItemList(srGachaItem);
         ExcelUtil<SrGachaItem> util = new ExcelUtil<SrGachaItem>(SrGachaItem.class);
         util.exportExcel(response, list, "卡池项目数据");
+    }
+
+    /**
+     * 查询尚未绑定卡池项目的角色/光锥候选
+     */
+    @Operation(summary = "查询可绑定角色/光锥", description = "按 itemType 查询尚未绑定到卡池项目的角色（character）或光锥（lightcone），供新增卡池项目时选择")
+    @PreAuthorize("@ss.hasPermi('srhelper:gachaItem:list')")
+    @GetMapping("/unboundOptions")
+    public AjaxResult unboundOptions(@RequestParam(required = false) String itemType)
+    {
+        return success(srGachaItemService.selectUnboundBindOptions(itemType));
     }
 
     /**

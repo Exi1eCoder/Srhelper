@@ -2,6 +2,7 @@ package com.quico.srhelper.mapper;
 
 import java.util.List;
 import com.quico.srhelper.domain.SrGachaItem;
+import com.quico.srhelper.domain.vo.GachaItemBindOptionVO;
 
 /**
  * 卡池项目Mapper接口
@@ -26,6 +27,20 @@ public interface SrGachaItemMapper
      * @return 卡池项目集合
      */
     public List<SrGachaItem> selectSrGachaItemList(SrGachaItem srGachaItem);
+
+    /**
+     * 查询尚未绑定卡池项目的角色（sr_gacha_item.sr_id 为空）
+     *
+     * @return 角色候选集合
+     */
+    public List<GachaItemBindOptionVO> selectUnboundCharacters();
+
+    /**
+     * 查询尚未绑定卡池项目的光锥（sr_gacha_item.sr_id 为空）
+     *
+     * @return 光锥候选集合
+     */
+    public List<GachaItemBindOptionVO> selectUnboundLightcones();
 
     /**
      * 新增卡池项目

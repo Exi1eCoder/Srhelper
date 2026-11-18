@@ -2,6 +2,7 @@ package com.quico.srhelper.service;
 
 import java.util.List;
 import com.quico.srhelper.domain.SrGachaItem;
+import com.quico.srhelper.domain.vo.GachaItemBindOptionVO;
 
 /**
  * 卡池项目Service接口
@@ -26,6 +27,14 @@ public interface ISrGachaItemService
      * @return 卡池项目集合
      */
     public List<SrGachaItem> selectSrGachaItemList(SrGachaItem srGachaItem);
+
+    /**
+     * 查询尚未绑定卡池项目的角色/光锥候选
+     *
+     * @param itemType 项目类型：character / lightcone
+     * @return 候选集合
+     */
+    public List<GachaItemBindOptionVO> selectUnboundBindOptions(String itemType);
 
     /**
      * 新增卡池项目

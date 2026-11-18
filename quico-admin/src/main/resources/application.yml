@@ -71,6 +71,45 @@ spring:
     restart:
       # 热部署开关
       enabled: true
+  # 邮件推送（阿里云邮件推送 DirectMail，SMTP 使用无域名自定义发信地址）
+  mail:
+    host: smtpdm.aliyun.com
+    port: 465
+    # 发信地址，与阿里云控制台配置的自定义地址一致
+    username: ${ALIYUN_MAIL_USERNAME:}
+    # SMTP 密码，通过环境变量注入，禁止写入仓库
+    password: ${ALIYUN_MAIL_PASSWORD:}
+    default-encoding: UTF-8
+    properties:
+      mail:
+        smtp:
+          auth: true
+          ssl:
+            enable: true
+          socketFactory:
+            class: javax.net.ssl.SSLSocketFactory
+            port: 465
+          connectiontimeout: 10000
+          timeout: 10000
+          writetimeout: 10000
+          # 信封发信地址必须与自定义发信地址一致，否则阿里云返回 554
+          from: ${ALIYUN_MAIL_USERNAME:}
+
+# 短信验证码（腾讯云 SMS，密钥通过环境变量注入，禁止写入仓库）
+sms:
+  tencent:
+    # API 密钥 SecretId
+    secret-id: ${TENCENT_SMS_SECRET_ID:}
+    # API 密钥 SecretKey
+    secret-key: ${TENCENT_SMS_SECRET_KEY:}
+    # 短信应用 SdkAppId
+    sdk-app-id: ${TENCENT_SMS_SDK_APP_ID:}
+    # 短信签名内容
+    sign-name: ${TENCENT_SMS_SIGN_NAME:}
+    # 短信模板 ID，模板变量两个：验证码、有效期分钟数
+    template-id: ${TENCENT_SMS_TEMPLATE_ID:}
+    # 短信接口地域
+    region: ${TENCENT_SMS_REGION:ap-nanjing}
 
 # 滑块验证码
 aj:

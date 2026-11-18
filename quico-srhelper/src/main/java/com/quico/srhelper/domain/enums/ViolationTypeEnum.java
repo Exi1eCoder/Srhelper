@@ -28,6 +28,8 @@ public enum ViolationTypeEnum
     DATA_TAMPERED_TAIL(1, "抽卡流水号尾部被篡改"),
     /** 流水号内嵌小时数与抽卡时间不一致 */
     DATA_TAMPERED_TIME(1, "抽卡流水号与抽卡时间不一致"),
+    /** 抽卡时间晚于系统当前时间（未来时间，疑似篡改） */
+    DATA_TAMPERED_FUTURE_TIME(1, "抽卡时间晚于系统时间"),
     /** 同一文件出现多个游戏账号 */
     MULTI_UID_ATTACK(1, "文件包含多个游戏账号");
 

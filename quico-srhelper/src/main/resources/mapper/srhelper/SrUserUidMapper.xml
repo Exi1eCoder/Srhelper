@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quico.srhelper.mapper.SrUserUidMapper">
+
+    <resultMap type="SrUserUid" id="SrUserUidResult">
+        <result property="id"    column="id"    />
+        <result property="uid"    column="uid"    />
+        <result property="userId"    column="user_id"    />
+        <result property="transferTime"    column="transfer_time"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <select id="selectByUid" parameterType="String" resultMap="SrUserUidResult">
+        select id, uid, user_id, transfer_time, create_time, update_time
+        from sr_user_uid
+        where uid = #{uid}
+        limit 1
+    </select>
+
+    <select id="countByUserId" parameterType="Long" resultType="long">
+        select count(1) from sr_user_uid where user_id = #{userId}
+    </select>
+
+    <insert id="insertSrUserUid" parameterType="SrUserUid" useGeneratedKeys="true" keyProperty="id">
+        insert into sr_user_uid (uid, user_id)
+        values (#{uid}, #{userId})
+    </insert>
+
+</mapper>

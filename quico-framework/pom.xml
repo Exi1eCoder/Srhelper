@@ -47,6 +47,12 @@
             <artifactId>spring-boot-starter-aspectj</artifactId>
         </dependency>
 
+        <!-- 邮件发送（阿里云邮件推送 SMTP） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
         <!-- 阿里数据库连接池 -->
         <dependency>
             <groupId>com.alibaba</groupId>
@@ -140,6 +146,12 @@
         <dependency>
             <groupId>com.anji-plus</groupId>
             <artifactId>captcha-spring-boot-starter</artifactId>
+        </dependency>
+
+        <!-- 腾讯云 SDK（短信验证码） -->
+        <dependency>
+            <groupId>com.tencentcloudapi</groupId>
+            <artifactId>tencentcloud-sdk-java</artifactId>
         </dependency>
 
         <!-- 微信小程序 Java SDK -->

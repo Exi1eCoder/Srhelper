@@ -28,6 +28,46 @@ public class CacheConstants
     public static final String SYS_DICT_KEY = "sys_dict:";
 
     /**
+     * 邮箱验证码 redis key（按用户 + 目标邮箱隔离）
+     */
+    public static final String EMAIL_CODE_KEY = "email_code:";
+
+    /**
+     * 邮箱验证码错误次数 redis key
+     */
+    public static final String EMAIL_CODE_ERROR_KEY = "email_code_error:";
+
+    /**
+     * 邮箱验证码发送间隔限制 redis key
+     */
+    public static final String EMAIL_CODE_LIMIT_KEY = "email_code_limit:";
+
+    /**
+     * 邮箱验证码每日发送量 redis key
+     */
+    public static final String EMAIL_CODE_DAILY_KEY = "email_code_daily:";
+
+    /**
+     * 手机验证码 redis key（按用户 + 目标手机号隔离）
+     */
+    public static final String PHONE_CODE_KEY = "phone_code:";
+
+    /**
+     * 手机验证码错误次数 redis key
+     */
+    public static final String PHONE_CODE_ERROR_KEY = "phone_code_error:";
+
+    /**
+     * 手机验证码发送间隔限制 redis key
+     */
+    public static final String PHONE_CODE_LIMIT_KEY = "phone_code_limit:";
+
+    /**
+     * 手机验证码每日发送量 redis key
+     */
+    public static final String PHONE_CODE_DAILY_KEY = "phone_code_daily:";
+
+    /**
      * 防重提交 redis key
      */
     public static final String REPEAT_SUBMIT_KEY = "repeat_submit:";

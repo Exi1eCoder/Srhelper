@@ -140,12 +140,14 @@ public class GachaUploadRiskService
     }
 
     /**
-     * 导入成功：清除用户与 IP 的失败计数
+     * 导入成功：只清除用户失败计数
+     *
+     * 不清 IP 计数：NAT/代理环境下，攻击者可用一个合法账号成功上传一次就把
+     * 出口 IP 的失败计数清零，使 IP 维度的封禁失效；IP 计数改为自然过期。
      */
-    public void clearFailCount(String userId, String ip)
+    public void clearFailCount(String userId)
     {
         redisTemplate.delete(SrhelperCacheConstants.GACHA_UPLOAD_FAIL_USER_PREFIX + userId);
-        redisTemplate.delete(SrhelperCacheConstants.GACHA_UPLOAD_FAIL_IP_PREFIX + ip);
     }
 
     /**

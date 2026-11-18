@@ -12,11 +12,13 @@ import java.time.format.DateTimeParseException;
 import java.time.format.ResolverStyle;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 
 import com.alibaba.excel.EasyExcel;
 import com.alibaba.excel.ExcelReader;
@@ -26,6 +28,7 @@ import com.quico.common.constant.CacheConstants;
 import com.quico.common.constant.HttpStatus;
 import com.quico.common.core.domain.entity.SysDictData;
 import com.quico.common.exception.BusinessException;
+import com.quico.common.exception.ServiceException;
 import com.quico.common.utils.DictUtils;
 import com.quico.common.utils.StringUtils;
 import com.quico.srhelper.domain.SrGachaRecord;
@@ -40,10 +43,11 @@ import org.springframework.web.multipart.MultipartFile;
 /**
  * 抽卡记录导入校验器（第一 ~ 第四层漏斗）
  *
+ * 前置：sr_gacha_item 字典是否配置（系统问题，尽早拒绝）
  * 第一层：物理与前置拦截（后缀、大小、xlsx 魔数）
  * 第二层：EasyExcel 流式解析（空文件、行数上限、解析异常）
- * 第三层：sr_gacha_item 字典白名单
- * 第四层：纯文件级防伪（是否包含rawData表、uid/流水号尾号、流水号内嵌小时数）
+ * 第三层：sr_gacha_item 字典内容白名单（在第四层之后执行，避免轻度掩盖重度）
+ * 第四层：纯文件级防伪（抽卡时间不得晚于系统当前时间、是否包含rawData表、uid/流水号尾号、流水号内嵌小时数）
  *
  * 第五层风控与审计见 {@link GachaUploadRiskService}
  *
@@ -119,8 +123,22 @@ public class GachaImportValidator
      */
     public List<SrGachaRecord> parse(MultipartFile file)
     {
+        return parse(file, null);
+    }
+
+    /**
+     * 第二层：解析文件，支持逐行守卫
+     *
+     * 守卫在读取每一行后立即回调：首行提取 uid 并做账号归属预检，
+     * 命中归属冲突即可中断解析，避免把整个无效文件读完。
+     *
+     * @param file 上传文件
+     * @param rowGuard 逐行守卫，可为 null
+     */
+    public List<SrGachaRecord> parse(MultipartFile file, Consumer<SrGachaRecord> rowGuard)
+    {
         String suffix = resolveSuffix(file);
-        List<SrGachaRecord> records = "csv".equals(suffix) ? parseCsv(file) : parseExcel(file);
+        List<SrGachaRecord> records = "csv".equals(suffix) ? parseCsv(file, rowGuard) : parseExcel(file, rowGuard);
         if (records == null || records.isEmpty())
         {
             throw new UploadValidateException(ViolationTypeEnum.FILE_EMPTY, "文件内容为空");
@@ -129,16 +147,32 @@ public class GachaImportValidator
     }
 
     /**
-     * 第三层：卡池类型字典白名单校验
+     * 卡池类型字典是否已配置
+     *
+     * 字典未初始化属于系统问题，不是用户违规：
+     * 在解析前尽早抛出，不审计、不计入用户信用
+     *
+     * @return 字典数据
      */
-    public void validateGachaType(List<SrGachaRecord> records)
+    public List<SysDictData> assertDictConfigured()
     {
         List<SysDictData> dictData = DictUtils.getDictCache(DICT_TYPE_GACHA);
         if (dictData == null || dictData.isEmpty())
         {
-            // 字典未初始化属于系统问题，不计入用户信用
             throw new BusinessException(HttpStatus.ERROR, "卡池类型字典未配置，请联系管理员");
         }
+        return dictData;
+    }
+
+    /**
+     * 第三层：卡池类型字典内容白名单校验
+     *
+     * 属于轻度违规，必须在第四层重度防伪之后执行，
+     * 避免 UNKNOWN_GACHA_TYPE 先抛出而掩盖 DATA_TAMPERED_* 等重度篡改
+     */
+    public void validateGachaType(List<SrGachaRecord> records)
+    {
+        List<SysDictData> dictData = assertDictConfigured();
         Set<String> allowedTypes = new HashSet<>();
         for (SysDictData dict : dictData)
         {
@@ -156,6 +190,8 @@ public class GachaImportValidator
 
     /**
      * 第四层：纯文件级防伪校验（逃生舱开启时跳过）
+     *
+     * 空文件由第二层 parse 统一拦截，此处不再重复校验
      */
     public void validateForgery(List<SrGachaRecord> records)
     {
@@ -164,10 +200,9 @@ public class GachaImportValidator
             log.warn("抽卡记录防伪校验已通过参数 {} 关闭，本次导入跳过第四层校验", FORGERY_CHECK_CONFIG_KEY);
             return;
         }
-        if (records == null || records.isEmpty())
-        {
-            throw new UploadValidateException(ViolationTypeEnum.FILE_EMPTY, "文件内容为空");
-        }
+
+        // 先查询文件中的抽卡时间：出现未来时间即为篡改/伪造，直接按重度篡改拒绝
+        validatePullTimeNotFuture(records);
 
         SrGachaRecord base = records.get(0);
         String baseUid = base.getUid();
@@ -208,6 +243,31 @@ public class GachaImportValidator
             for (int i = from; i < to; i++)
             {
                 validateRecordForForgery(records.get(i), i, baseUid, baseRecordTail, idTimeStyle);
+            }
+        }
+    }
+
+    /**
+     * 抽卡时间不得晚于系统当前时间
+     *
+     * 文件出现未来抽卡时间，说明原始数据被篡改或伪造，
+     * 按重度篡改（isMalicious = 1）直接拒绝，并写入第五层审计日志。
+     * 时间缺失的记录不在此处拦截，由后续按行号给出具体原因。
+     */
+    private void validatePullTimeNotFuture(List<SrGachaRecord> records)
+    {
+        Date now = new Date();
+        for (int i = 0; i < records.size(); i++)
+        {
+            SrGachaRecord record = records.get(i);
+            if (record == null || record.getTime() == null)
+            {
+                continue;
+            }
+            if (record.getTime().after(now))
+            {
+                throw new UploadValidateException(ViolationTypeEnum.DATA_TAMPERED_FUTURE_TIME,
+                        "第 " + (i + 1) + " 条记录抽卡时间晚于系统当前时间");
             }
         }
     }
@@ -275,12 +335,12 @@ public class GachaImportValidator
     /**
      * EasyExcel 流式解析 rawData sheet
      */
-    private List<SrGachaRecord> parseExcel(MultipartFile file)
+    private List<SrGachaRecord> parseExcel(MultipartFile file, Consumer<SrGachaRecord> rowGuard)
     {
         String sheetName = resolveRawDataSheet(file);
         try (InputStream inputStream = file.getInputStream())
         {
-            GachaRawDataReadListener listener = new GachaRawDataReadListener();
+            GachaRawDataReadListener listener = new GachaRawDataReadListener(rowGuard);
             EasyExcel.read(inputStream, listener)
                     .headRowNumber(1)
                     .sheet(sheetName)
@@ -293,20 +353,20 @@ public class GachaImportValidator
         }
         catch (ExcelAnalysisException e)
         {
-            UploadValidateException validateException = findUploadValidateException(e);
-            if (validateException != null)
+            RuntimeException businessException = findBusinessException(e);
+            if (businessException != null)
             {
-                throw validateException;
+                throw businessException;
             }
             throw new UploadValidateException(ViolationTypeEnum.PARSE_ERROR,
                     "文件解析失败，请确认上传的是游戏原始导出文件");
         }
         catch (Exception e)
         {
-            UploadValidateException validateException = findUploadValidateException(e);
-            if (validateException != null)
+            RuntimeException businessException = findBusinessException(e);
+            if (businessException != null)
             {
-                throw validateException;
+                throw businessException;
             }
             log.warn("抽卡记录文件解析异常", e);
             throw new UploadValidateException(ViolationTypeEnum.PARSE_ERROR,
@@ -362,7 +422,7 @@ public class GachaImportValidator
     /**
      * CSV 轻量解析（首行表头，UTF-8）
      */
-    private List<SrGachaRecord> parseCsv(MultipartFile file)
+    private List<SrGachaRecord> parseCsv(MultipartFile file, Consumer<SrGachaRecord> rowGuard)
     {
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8)))
@@ -401,8 +461,14 @@ public class GachaImportValidator
                             "单次导入不能超过 " + GachaRawDataReadListener.MAX_DATA_ROWS + " 条记录");
                 }
                 List<String> cells = splitCsvLine(line);
-                records.add(GachaRawDataReadListener.buildRecord(columnMap,
-                        index -> index < cells.size() ? cells.get(index) : null));
+                SrGachaRecord record = GachaRawDataReadListener.buildRecord(columnMap,
+                        index -> index < cells.size() ? cells.get(index) : null);
+                records.add(record);
+                if (rowGuard != null)
+                {
+                    // 首行即校验账号归属，命中即中断解析
+                    rowGuard.accept(record);
+                }
             }
             return records;
         }
@@ -412,10 +478,10 @@ public class GachaImportValidator
         }
         catch (Exception e)
         {
-            UploadValidateException validateException = findUploadValidateException(e);
-            if (validateException != null)
+            RuntimeException businessException = findBusinessException(e);
+            if (businessException != null)
             {
-                throw validateException;
+                throw businessException;
             }
             log.warn("抽卡记录 CSV 解析异常", e);
             throw new UploadValidateException(ViolationTypeEnum.PARSE_ERROR,
@@ -501,14 +567,18 @@ public class GachaImportValidator
         }
     }
 
-    private UploadValidateException findUploadValidateException(Throwable throwable)
+    /**
+     * 从异常链中查找业务异常（用户违规或账号归属等业务拦截）
+     * 解析库可能把运行时异常包装成 ExcelAnalysisException，需要还原真实原因
+     */
+    private RuntimeException findBusinessException(Throwable throwable)
     {
         Throwable current = throwable;
         while (current != null)
         {
-            if (current instanceof UploadValidateException)
+            if (current instanceof UploadValidateException || current instanceof ServiceException)
             {
-                return (UploadValidateException) current;
+                return (RuntimeException) current;
             }
             current = current.getCause();
         }

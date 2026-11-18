@@ -50,6 +50,7 @@
         <just-auth.version>1.16.7</just-auth.version>
         <captcha.version>1.4.0</captcha.version>
         <wxjava.version>4.6.0</wxjava.version>
+        <tencentcloud-sdk-java.version>3.1.302</tencentcloud-sdk-java.version>
     </properties>
 
     <!-- 依赖声明 -->
@@ -380,6 +381,14 @@
                 <artifactId>weixin-java-miniapp</artifactId>
                 <version>${wxjava.version}</version>
             </dependency>
+
+            <!-- 腾讯云 SDK -->
+            <dependency>
+                <groupId>com.tencentcloudapi</groupId>
+                <artifactId>tencentcloud-sdk-java</artifactId>
+                <version>${tencentcloud-sdk-java.version}</version>
+            </dependency>
+
         </dependencies>
     </dependencyManagement>
 

@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.function.IntFunction;
 
 import com.alibaba.excel.context.AnalysisContext;
@@ -36,7 +37,20 @@ public class GachaRawDataReadListener extends AnalysisEventListener<Map<Integer,
 
     private final List<SrGachaRecord> records = new ArrayList<>();
 
+    /** 逐行守卫：用于首行提取账号并校验归属、逐行校验 uid 一致；可为 null */
+    private final Consumer<SrGachaRecord> rowGuard;
+
     private int rowCount;
+
+    public GachaRawDataReadListener()
+    {
+        this(null);
+    }
+
+    public GachaRawDataReadListener(Consumer<SrGachaRecord> rowGuard)
+    {
+        this.rowGuard = rowGuard;
+    }
 
     @Override
     public void invokeHeadMap(Map<Integer, String> headMap, AnalysisContext context)
@@ -73,7 +87,13 @@ public class GachaRawDataReadListener extends AnalysisEventListener<Map<Integer,
         {
             return;
         }
-        records.add(buildRecord(columnMap, row::get));
+        SrGachaRecord record = buildRecord(columnMap, row::get);
+        records.add(record);
+        if (rowGuard != null)
+        {
+            // 首行即校验账号归属，命中即中断解析，避免读完整个无效文件
+            rowGuard.accept(record);
+        }
     }
 
     @Override

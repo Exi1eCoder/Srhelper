@@ -68,12 +68,13 @@ public interface ISrGachaRecordService
      * @param list 解析后的跃迁记录列表
      * @param updateSupport 是否更新已存在数据
      * @param operName 操作者
+     * @param bindUid 需要先到先得绑定的游戏账号UID；null 表示不做账号绑定
      * @return 结构化导入结果（含 needRecalc/uid/message）
      */
-    public GachaImportResult importGachaRecord(List<SrGachaRecord> list, boolean updateSupport, String operName);
+    public GachaImportResult importGachaRecord(List<SrGachaRecord> list, boolean updateSupport, String operName, String bindUid);
 
     /**
-     * 带五层风控的导入：封禁拦截 -> 物理校验 -> 解析 -> 字典白名单 -> 防伪 -> 入库 -> 风控审计
+     * 带五层风控的导入：封禁拦截 -> 字典配置 -> 物理校验 -> 解析（逐行守卫：首行校验账号归属、逐行校验 uid 一致） -> 防伪 -> 卡池白名单 -> 入库 -> 风控审计
      *
      * Controller 只负责接参与调用本方法，异常统一交由全局异常处理器封装
      *

@@ -1,11 +1,13 @@
 package com.quico.srhelper.service.impl;
 
 import java.util.List;
+import com.quico.common.exception.BusinessException;
 import com.quico.common.utils.DateUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.quico.srhelper.mapper.SrGachaItemMapper;
 import com.quico.srhelper.domain.SrGachaItem;
+import com.quico.srhelper.domain.vo.GachaItemBindOptionVO;
 import com.quico.srhelper.service.ISrGachaItemService;
 
 /**
@@ -42,6 +44,27 @@ public class SrGachaItemServiceImpl implements ISrGachaItemService
     public List<SrGachaItem> selectSrGachaItemList(SrGachaItem srGachaItem)
     {
         return srGachaItemMapper.selectSrGachaItemList(srGachaItem);
+    }
+
+    /**
+     * 查询尚未绑定卡池项目的角色/光锥候选
+     *
+     * @param itemType 项目类型：character / lightcone
+     * @return 候选集合
+     */
+    @Override
+    public List<GachaItemBindOptionVO> selectUnboundBindOptions(String itemType)
+    {
+        String type = itemType == null ? "" : itemType.trim().toLowerCase();
+        if ("character".equals(type))
+        {
+            return srGachaItemMapper.selectUnboundCharacters();
+        }
+        if ("lightcone".equals(type))
+        {
+            return srGachaItemMapper.selectUnboundLightcones();
+        }
+        throw BusinessException.badRequest("itemType 仅支持 character 或 lightcone");
     }
 
     /**

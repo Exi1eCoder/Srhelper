@@ -36,6 +36,44 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where id = #{id}
     </select>
 
+    <!-- 尚未绑定卡池项目的角色：sr_gacha_item 中不存在 item_type=character 且 sr_id = 角色ID 的记录。
+         sr_id 为 NULL、空串或纯空白时与 cast(id as char) 不相等，自然视为未绑定。 -->
+    <select id="selectUnboundCharacters" resultType="com.quico.srhelper.domain.vo.GachaItemBindOptionVO">
+        select c.id             as id,
+               c.character_name as item_name,
+               'character'      as item_type,
+               c.avatar         as icon_url,
+               c.star_level     as star_level,
+               c.path           as path
+        from sr_character c
+        where not exists (
+            select 1
+            from sr_gacha_item g
+            where g.item_type = 'character'
+              and trim(g.sr_id) = cast(c.id as char)
+        )
+        order by c.sort_order desc, c.id desc
+    </select>
+
+    <!-- 尚未绑定卡池项目的光锥：sr_gacha_item 中不存在 item_type=lightcone 且 sr_id = 光锥ID 的记录。
+         sr_id 为 NULL、空串或纯空白时与 cast(id as char) 不相等，自然视为未绑定。 -->
+    <select id="selectUnboundLightcones" resultType="com.quico.srhelper.domain.vo.GachaItemBindOptionVO">
+        select l.id            as id,
+               l.lightcone_name as item_name,
+               'lightcone'     as item_type,
+               l.image         as icon_url,
+               l.star_level    as star_level,
+               l.path          as path
+        from sr_lightcone l
+        where not exists (
+            select 1
+            from sr_gacha_item g
+            where g.item_type = 'lightcone'
+              and trim(g.sr_id) = cast(l.id as char)
+        )
+        order by l.sort_order desc, l.id desc
+    </select>
+
     <insert id="insertSrGachaItem" parameterType="SrGachaItem" useGeneratedKeys="true" keyProperty="id">
         insert into sr_gacha_item
         <trim prefix="(" suffix=")" suffixOverrides=",">

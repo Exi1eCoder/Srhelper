@@ -21,7 +21,9 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import com.quico.srhelper.service.helper.GachaAccountRowGuard;
 import com.quico.srhelper.service.helper.GachaImportValidator;
+import com.quico.srhelper.service.helper.GachaAccountBindingService;
 import com.quico.srhelper.service.helper.GachaRecordImageCacheManager;
 import com.quico.srhelper.service.helper.GachaUploadRiskService;
 import com.quico.srhelper.domain.dto.GachaImportResult;
@@ -60,6 +62,9 @@ public class SrGachaRecordServiceImpl implements ISrGachaRecordService
     @Autowired
     private GachaUploadRiskService gachaUploadRiskService;
 
+    @Autowired
+    private GachaAccountBindingService gachaAccountBindingService;
+
     /**
      * 自身代理：WithRisk 内部调用带 @Transactional 的入库方法需要经过代理，否则事务不生效
      */
@@ -85,22 +90,31 @@ public class SrGachaRecordServiceImpl implements ISrGachaRecordService
 
         try
         {
-            // 2. 五层漏斗校验
+            // 2. 系统依赖检查：字典未配置属于系统问题，尽早拒绝，不审计、不计用户信用
+            gachaImportValidator.assertDictConfigured();
+
+            // 3. 解析时逐行守卫：首行即提取 uid 并校验账号归属，命中立刻中断解析；
+            //    后续行校验 uid 一致，多账号拼接在解析阶段即被拦截
+            Long currentUserId = Long.valueOf(userId);
+            GachaAccountRowGuard accountGuard = new GachaAccountRowGuard(gachaAccountBindingService, currentUserId);
             gachaImportValidator.validatePhysical(file);
-            List<SrGachaRecord> recordList = gachaImportValidator.parse(file);
-            gachaImportValidator.validateGachaType(recordList);
+            List<SrGachaRecord> recordList = gachaImportValidator.parse(file, accountGuard);
+
+            // 4. 重度防伪必须早于轻度卡池内容校验，避免轻度掩盖重度
             gachaImportValidator.validateForgery(recordList);
+            gachaImportValidator.validateGachaType(recordList);
 
-            // 3. 核心业务入库（走代理，保证 @Transactional 生效）
-            GachaImportResult result = selfProxy.importGachaRecord(recordList, updateSupport, userId);
+            // 5. 核心业务入库（走代理，保证 @Transactional 生效，绑定与入库同事务）
+            GachaImportResult result = selfProxy.importGachaRecord(recordList, updateSupport, userId,
+                    accountGuard.getBaseUid());
 
-            // 4. 成功清理失败计数
-            gachaUploadRiskService.clearFailCount(userId, ip);
+            // 6. 成功只清理用户失败计数，IP 计数按自然过期，避免合法账号洗掉出口 IP 计数
+            gachaUploadRiskService.clearFailCount(userId);
             return result;
         }
         catch (UploadValidateException e)
         {
-            // 5. 风控审计与信用分级，handleViolationAsException 内部会抛出对应业务异常
+            // 7. 风控审计与信用分级，handleViolationAsException 内部会抛出对应业务异常
             gachaUploadRiskService.handleViolationAsException(e, Long.valueOf(userId), ip, file);
             throw e;
         }
@@ -204,11 +218,13 @@ public class SrGachaRecordServiceImpl implements ISrGachaRecordService
      * @param list 解析后的跃迁记录列表
      * @param updateSupport 是否更新已存在数据
      * @param operName 操作者（平台用户ID）
+     * @param bindUid 需要先到先得绑定的游戏账号UID；null 表示不做账号绑定
      * @return 结构化导入结果
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public GachaImportResult importGachaRecord(List<SrGachaRecord> list, boolean updateSupport, String operName)
+    public GachaImportResult importGachaRecord(List<SrGachaRecord> list, boolean updateSupport, String operName,
+            String bindUid)
     {
         if (list == null || list.isEmpty())
         {
@@ -266,10 +282,16 @@ public class SrGachaRecordServiceImpl implements ISrGachaRecordService
             }
         }
 
-        // 4. 计算新记录计数器，并收集发生历史插入的 uid
+        // 4. 先到先得绑定：与入库同事务，入库失败或没有有效数据时绑定一起回滚
+        if (bindUid != null && (!toInsert.isEmpty() || !toUpdate.isEmpty()))
+        {
+            gachaAccountBindingService.bind(bindUid, Long.valueOf(operName));
+        }
+
+        // 5. 计算新记录计数器，并收集发生历史插入的 uid
         Set<String> historicalUids = calculateCountersForImport(toInsert);
 
-        // 5. 批量插入（计数器已计算）
+        // 6. 批量插入（计数器已计算）
         int successNum = 0;
         if (!toInsert.isEmpty())
         {
@@ -277,7 +299,7 @@ public class SrGachaRecordServiceImpl implements ISrGachaRecordService
             successNum = toInsert.size();
         }
 
-        // 6. 更新已存在记录（单条更新，参与当前事务保证原子性）
+        // 7. 更新已存在记录（单条更新，参与当前事务保证原子性）
         int updateNum = 0;
         for (SrGachaRecord record : toUpdate)
         {
@@ -285,13 +307,13 @@ public class SrGachaRecordServiceImpl implements ISrGachaRecordService
             updateNum++;
         }
 
-        // 7. 历史插入的 uid 提交异步重算
+        // 8. 历史插入的 uid 提交异步重算
         for (String uid : historicalUids)
         {
             gachaRecalcService.submit(uid);
         }
 
-        // 8. 构建返回消息
+        // 9. 构建返回消息
         StringBuilder resultMsg = new StringBuilder();
         resultMsg.append("导入完成：新增 ").append(successNum).append(" 条");
         if (updateNum > 0)
