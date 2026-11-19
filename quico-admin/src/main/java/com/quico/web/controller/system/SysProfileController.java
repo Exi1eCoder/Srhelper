@@ -26,6 +26,7 @@ import com.quico.common.utils.file.MimeTypeUtils;
 import com.quico.framework.web.service.EmailVerifyCodeService;
 import com.quico.framework.web.service.SmsVerifyCodeService;
 import com.quico.framework.web.service.TokenService;
+import com.quico.framework.web.service.VerificationCodeSwitch;
 import com.quico.system.domain.dto.ProfileUpdateBody;
 import com.quico.system.service.ISysUserService;
 import com.quico.common.annotation.RepeatSubmit;
@@ -41,6 +42,9 @@ public class SysProfileController extends BaseController
 {
     @Autowired
     private ISysUserService userService;
+
+    @Autowired
+    private VerificationCodeSwitch verificationCodeSwitch;
 
     @Autowired
     private TokenService tokenService;
@@ -67,6 +71,17 @@ public class SysProfileController extends BaseController
     }
 
     /**
+     * 查询邮箱/手机验证码开关
+     */
+    @GetMapping("/verifyCodeEnabled")
+    public AjaxResult verifyCodeEnabled()
+    {
+        return AjaxResult.success()
+                .put("mailVerificationCode", verificationCodeSwitch.mailVerificationCodeEnabled())
+                .put("phoneVerificationCode", verificationCodeSwitch.phoneVerificationCodeEnabled());
+    }
+
+    /**
      * 发送邮箱验证码
      *
      * 验证码发送到「待绑定的新邮箱」，用户拿到验证码即证明可控制该邮箱
@@ -75,6 +90,10 @@ public class SysProfileController extends BaseController
     @PostMapping("/emailCode")
     public AjaxResult emailCode(@RequestBody Map<String, String> params)
     {
+        if (!verificationCodeSwitch.mailVerificationCodeEnabled())
+        {
+            return success("邮箱验证码校验已关闭");
+        }
         LoginUser loginUser = getLoginUser();
         String email = StringUtils.trim(params.get("email"));
         if (StringUtils.isNotEmpty(email))
@@ -100,6 +119,10 @@ public class SysProfileController extends BaseController
     @PostMapping("/phoneCode")
     public AjaxResult phoneCode(@RequestBody Map<String, String> params)
     {
+        if (!verificationCodeSwitch.phoneVerificationCodeEnabled())
+        {
+            return success("手机验证码校验已关闭");
+        }
         LoginUser loginUser = getLoginUser();
         String phonenumber = StringUtils.trim(params.get("phonenumber"));
         if (StringUtils.isNotEmpty(phonenumber))
@@ -129,13 +152,15 @@ public class SysProfileController extends BaseController
         LoginUser loginUser = getLoginUser();
         SysUser currentUser = loginUser.getUser();
         String newEmail = StringUtils.trim(body.getEmail());
-        if (StringUtils.isNotEmpty(newEmail) && !newEmail.equals(StringUtils.trim(currentUser.getEmail())))
+        if (verificationCodeSwitch.mailVerificationCodeEnabled()
+                && StringUtils.isNotEmpty(newEmail) && !newEmail.equals(StringUtils.trim(currentUser.getEmail())))
         {
             // 先校验验证码再修改缓存中的用户对象，避免校验失败污染登录态
             emailVerifyCodeService.verify(newEmail, loginUser.getUserId(), body.getCode());
         }
         String newPhonenumber = StringUtils.trim(body.getPhonenumber());
-        if (StringUtils.isNotEmpty(newPhonenumber)
+        if (verificationCodeSwitch.phoneVerificationCodeEnabled()
+                && StringUtils.isNotEmpty(newPhonenumber)
                 && !newPhonenumber.equals(StringUtils.trim(currentUser.getPhonenumber())))
         {
             smsVerifyCodeService.verify(newPhonenumber, loginUser.getUserId(), body.getPhoneCode());

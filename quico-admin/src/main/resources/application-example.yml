@@ -82,3 +82,25 @@ spring:
                     max-active: 50
                     # #连接池最大阻塞等待时间（使用负值表示没有限制）
                     max-wait: -1ms
+        # 邮件推送（阿里云邮件推送 DirectMail）
+    mail:
+        # 阿里云控制台配置的自定义发信地址，需与 mail.smtp.from 一致
+        username: ${ALIYUN_MAIL_USERNAME:}
+        # 该发信地址的 SMTP 密码（非 AccessKey），生产环境改用环境变量注入
+        password: ${ALIYUN_MAIL_PASSWORD:}
+
+sms:
+    tencent:
+        secret-id: ${TENCENT_SMS_SECRET_ID:} # API 密钥 SecretId
+        secret-key: ${TENCENT_SMS_SECRET_KEY:} # API 密钥 SecretKey
+        sdk-app-id: ${TENCENT_SMS_SDK_APP_ID:} # 短信应用 SdkAppId
+        sign-name: ${TENCENT_SMS_SIGN_NAME:} # 短信签名内容
+        template-id: ${TENCENT_SMS_TEMPLATE_ID:} # 短信模板 ID，模板变量两个：验证码、有效期分钟数
+        region: ${TENCENT_SMS_REGION:ap-nanjing} # 短信接口地域
+
+# 微信小程序配置
+wechat:
+    miniapp:
+        appid: ${WECHAT_MINIAPP_APPID:} #小程序appid
+        secret: ${WECHAT_MINIAPP_SECRET:} #小程序密钥
+        mchid: ${WECHAT_MINIAPP_MCHID:} #商户号

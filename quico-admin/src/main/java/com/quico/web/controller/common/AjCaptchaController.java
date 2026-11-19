@@ -11,9 +11,8 @@ import com.anji.captcha.model.common.ResponseModel;
 import com.anji.captcha.model.vo.CaptchaVO;
 import com.anji.captcha.service.CaptchaService;
 import com.quico.common.core.domain.AjaxResult;
-import com.quico.common.core.text.Convert;
 import com.quico.common.utils.StringUtils;
-import com.quico.system.service.ISysConfigService;
+import com.quico.framework.web.service.VerificationCodeSwitch;
 
 /**
  * 滑块验证码（aj-captcha）
@@ -24,16 +23,11 @@ import com.quico.system.service.ISysConfigService;
 @RequestMapping("/captcha")
 public class AjCaptchaController
 {
-    /**
-     * 滑动验证码开关参数
-     */
-    private static final String AJ_CAPTCHA_CHECK_KEY = "sys.account.ajCaptchaCheck";
-
     @Autowired
     private CaptchaService captchaService;
 
     @Autowired
-    private ISysConfigService configService;
+    private VerificationCodeSwitch verificationCodeSwitch;
 
     /**
      * 查询验证码开关
@@ -44,8 +38,8 @@ public class AjCaptchaController
         // captchaEnabled：图形验证码开关（sys.account.captchaEnabled）
         // ajCaptchaCheck：滑动验证码开关（sys.account.ajCaptchaCheck）
         return AjaxResult.success()
-                .put("captchaEnabled", configService.selectCaptchaEnabled())
-                .put("ajCaptchaCheck", ajCaptchaCheckEnabled());
+                .put("captchaEnabled", verificationCodeSwitch.captchaEnabled())
+                .put("ajCaptchaCheck", verificationCodeSwitch.ajCaptchaCheckEnabled());
     }
 
     /**
@@ -54,7 +48,7 @@ public class AjCaptchaController
     @PostMapping("/get")
     public ResponseModel get(@RequestBody CaptchaVO data, HttpServletRequest request)
     {
-        if (!ajCaptchaCheckEnabled())
+        if (!verificationCodeSwitch.ajCaptchaCheckEnabled())
         {
             return ResponseModel.successMsg("滑动验证码已关闭");
         }
@@ -68,25 +62,12 @@ public class AjCaptchaController
     @PostMapping("/check")
     public ResponseModel check(@RequestBody CaptchaVO data, HttpServletRequest request)
     {
-        if (!ajCaptchaCheckEnabled())
+        if (!verificationCodeSwitch.ajCaptchaCheckEnabled())
         {
             return ResponseModel.successMsg("滑动验证码已关闭");
         }
         data.setBrowserInfo(getRemoteId(request));
         return captchaService.check(data);
-    }
-
-    /**
-     * 滑动验证码开关，未配置时默认开启
-     */
-    private boolean ajCaptchaCheckEnabled()
-    {
-        String enabled = configService.selectConfigByKey(AJ_CAPTCHA_CHECK_KEY);
-        if (StringUtils.isEmpty(enabled))
-        {
-            return true;
-        }
-        return Convert.toBool(enabled, Boolean.TRUE);
     }
 
     public static String getRemoteId(HttpServletRequest request)
