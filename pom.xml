@@ -66,6 +66,23 @@
                 <scope>import</scope>
             </dependency>
 
+            <!-- 统一 OkHttp/Okio 版本：MinIO 8.5.7 需要 OkHttp 4.12 + Okio 3.x，避免被腾讯云 SDK 自带的老版 Okio 1.12 顶掉 -->
+            <dependency>
+                <groupId>com.squareup.okhttp3</groupId>
+                <artifactId>okhttp</artifactId>
+                <version>4.12.0</version>
+            </dependency>
+            <dependency>
+                <groupId>com.squareup.okhttp3</groupId>
+                <artifactId>logging-interceptor</artifactId>
+                <version>4.12.0</version>
+            </dependency>
+            <dependency>
+                <groupId>com.squareup.okio</groupId>
+                <artifactId>okio</artifactId>
+                <version>3.6.0</version>
+            </dependency>
+
             <!-- 阿里数据库连接池 -->
             <dependency>
                 <groupId>com.alibaba</groupId>
