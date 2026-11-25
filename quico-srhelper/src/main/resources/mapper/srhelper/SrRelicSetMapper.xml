@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quico.srhelper.mapper.SrRelicSetMapper">
+    
+    <resultMap type="SrRelicSet" id="SrRelicSetResult">
+        <result property="id"    column="id"    />
+        <result property="setId"    column="set_id"    />
+        <result property="setName"    column="set_name"    />
+        <result property="desc2pc"    column="desc_2pc"    />
+        <result property="desc4pc"    column="desc_4pc"    />
+        <result property="setCategory"    column="set_category"    />
+        <result property="icon"    column="icon"    />
+        <result property="releaseVersion"    column="release_version"    />
+        <result property="sortOrder"    column="sort_order"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"    column="remark"    />
+    </resultMap>
+
+    <sql id="selectSrRelicSetVo">
+        select id, set_id, set_name, desc_2pc, desc_4pc, set_category, icon, release_version, sort_order, create_by, create_time, update_by, update_time, remark from sr_relic_set
+    </sql>
+
+    <select id="selectSrRelicSetList" parameterType="SrRelicSet" resultMap="SrRelicSetResult">
+        <include refid="selectSrRelicSetVo"/>
+        <where>  
+            <if test="setName != null  and setName != ''"> and set_name like concat('%', #{setName}, '%')</if>
+            <if test="setCategory != null  and setCategory != ''"> and set_category = #{setCategory}</if>
+            <if test="releaseVersion != null  and releaseVersion != ''"> and release_version = #{releaseVersion}</if>
+        </where>
+        order by sort_order desc
+    </select>
+    
+    <select id="selectSrRelicSetById" parameterType="Long" resultMap="SrRelicSetResult">
+        <include refid="selectSrRelicSetVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertSrRelicSet" parameterType="SrRelicSet" useGeneratedKeys="true" keyProperty="id">
+        insert into sr_relic_set
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="setId != null and setId != ''">set_id,</if>
+            <if test="setName != null">set_name,</if>
+            <if test="desc2pc != null">desc_2pc,</if>
+            <if test="desc4pc != null">desc_4pc,</if>
+            <if test="setCategory != null">set_category,</if>
+            <if test="icon != null">icon,</if>
+            <if test="releaseVersion != null">release_version,</if>
+            <if test="sortOrder != null">sort_order,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="remark != null">remark,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="setId != null and setId != ''">#{setId},</if>
+            <if test="setName != null">#{setName},</if>
+            <if test="desc2pc != null">#{desc2pc},</if>
+            <if test="desc4pc != null">#{desc4pc},</if>
+            <if test="setCategory != null">#{setCategory},</if>
+            <if test="icon != null">#{icon},</if>
+            <if test="releaseVersion != null">#{releaseVersion},</if>
+            <if test="sortOrder != null">#{sortOrder},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="remark != null">#{remark},</if>
+         </trim>
+    </insert>
+
+    <update id="updateSrRelicSet" parameterType="SrRelicSet">
+        update sr_relic_set
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="setId != null and setId != ''">set_id = #{setId},</if>
+            <if test="setName != null">set_name = #{setName},</if>
+            <if test="desc2pc != null">desc_2pc = #{desc2pc},</if>
+            <if test="desc4pc != null">desc_4pc = #{desc4pc},</if>
+            <if test="setCategory != null">set_category = #{setCategory},</if>
+            <if test="icon != null">icon = #{icon},</if>
+            <if test="releaseVersion != null">release_version = #{releaseVersion},</if>
+            <if test="sortOrder != null">sort_order = #{sortOrder},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteSrRelicSetById" parameterType="Long">
+        delete from sr_relic_set where id = #{id}
+    </delete>
+
+    <delete id="deleteSrRelicSetByIds" parameterType="String">
+        delete from sr_relic_set where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

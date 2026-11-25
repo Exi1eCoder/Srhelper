@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quico.srhelper.mapper.SrUserRelicMapper">
+
+    <resultMap type="SrUserRelic" id="SrUserRelicResult">
+        <result property="id"              column="id"                />
+        <result property="userId"          column="user_id"           />
+        <result property="relicId"         column="relic_id"          />
+        <result property="level"           column="level"             />
+        <result property="initialSubCount" column="initial_sub_count" />
+        <result property="subUpgradeUsed"  column="sub_upgrade_used"  />
+        <result property="mainProperty"    column="main_property"     />
+        <result property="mainValue"       column="main_value"        />
+        <result property="equippedBy"      column="equipped_by"       />
+        <result property="locked"          column="locked"            />
+        <result property="origin"          column="origin"            />
+        <result property="sortOrder"       column="sort_order"        />
+        <result property="createBy"        column="create_by"         />
+        <result property="createTime"      column="create_time"       />
+        <result property="updateBy"        column="update_by"         />
+        <result property="updateTime"      column="update_time"       />
+        <result property="remark"          column="remark"            />
+        <result property="relicName"       column="relic_name"        />
+        <result property="slot"            column="slot"              />
+        <result property="icon"            column="icon"              />
+        <result property="rarity"          column="rarity"            />
+        <result property="setId"           column="set_id"            />
+        <result property="setName"         column="set_name"          />
+    </resultMap>
+
+    <sql id="selectSrUserRelicVo">
+        select ur.id, ur.user_id, ur.relic_id, ur.level, ur.initial_sub_count, ur.sub_upgrade_used,
+               ur.main_property, ur.main_value, ur.equipped_by, ur.locked, ur.origin, ur.sort_order,
+               ur.create_by, ur.create_time, ur.update_by, ur.update_time, ur.remark,
+               r.relic_name, ur.slot, r.icon, r.rarity, r.set_id, s.set_name
+        from sr_user_relic ur
+        left join sr_relic r on r.relic_id = ur.relic_id
+        left join sr_relic_set s on s.set_id = r.set_id
+    </sql>
+
+    <select id="selectSrUserRelicById" parameterType="Long" resultMap="SrUserRelicResult">
+        <include refid="selectSrUserRelicVo"/>
+        where ur.id = #{id}
+    </select>
+
+    <select id="selectSrUserRelicList" parameterType="SrUserRelic" resultMap="SrUserRelicResult">
+        <include refid="selectSrUserRelicVo"/>
+        <where>
+            <if test="userId != null">and ur.user_id = #{userId}</if>
+            <if test="relicId != null and relicId != ''">and ur.relic_id = #{relicId}</if>
+            <if test="slot != null and slot != ''">and ur.slot = #{slot}</if>
+            <if test="setId != null and setId != ''">and r.set_id = #{setId}</if>
+            <if test="equippedBy != null">and ur.equipped_by = #{equippedBy}</if>
+            <if test="origin != null and origin != ''">and ur.origin = #{origin}</if>
+        </where>
+        order by ur.id desc
+    </select>
+
+    <select id="selectSrUserRelicByIds" parameterType="Long" resultMap="SrUserRelicResult">
+        select id, user_id, relic_id, slot, level, initial_sub_count, sub_upgrade_used,
+               main_property, main_value, equipped_by, locked, origin, sort_order,
+               create_by, create_time, update_by, update_time, remark
+        from sr_user_relic
+        where id in
+        <foreach collection="array" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <select id="selectEquippedRelicBySlot" resultMap="SrUserRelicResult">
+        select id, user_id, relic_id, slot, equipped_by, locked, origin
+        from sr_user_relic
+        where user_id = #{userId}
+          and equipped_by = #{equippedBy}
+          and slot = #{slot}
+        <if test="excludeId != null">and id != #{excludeId}</if>
+    </select>
+
+    <insert id="insertSrUserRelic" parameterType="SrUserRelic" useGeneratedKeys="true" keyProperty="id">
+        insert into sr_user_relic
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="userId != null">user_id,</if>
+            <if test="relicId != null">relic_id,</if>
+            <if test="slot != null">slot,</if>
+            <if test="level != null">level,</if>
+            <if test="initialSubCount != null">initial_sub_count,</if>
+            <if test="subUpgradeUsed != null">sub_upgrade_used,</if>
+            <if test="mainProperty != null">main_property,</if>
+            <if test="mainValue != null">main_value,</if>
+            <if test="equippedBy != null">equipped_by,</if>
+            <if test="locked != null">locked,</if>
+            <if test="origin != null">origin,</if>
+            <if test="sortOrder != null">sort_order,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="remark != null">remark,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="userId != null">#{userId},</if>
+            <if test="relicId != null">#{relicId},</if>
+            <if test="slot != null">#{slot},</if>
+            <if test="level != null">#{level},</if>
+            <if test="initialSubCount != null">#{initialSubCount},</if>
+            <if test="subUpgradeUsed != null">#{subUpgradeUsed},</if>
+            <if test="mainProperty != null">#{mainProperty},</if>
+            <if test="mainValue != null">#{mainValue},</if>
+            <if test="equippedBy != null">#{equippedBy},</if>
+            <if test="locked != null">#{locked},</if>
+            <if test="origin != null">#{origin},</if>
+            <if test="sortOrder != null">#{sortOrder},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="remark != null">#{remark},</if>
+        </trim>
+    </insert>
+
+    <update id="updateSrUserRelic" parameterType="SrUserRelic">
+        update sr_user_relic
+        set relic_id = #{relicId},
+            slot = #{slot},
+            level = #{level},
+            initial_sub_count = #{initialSubCount},
+            sub_upgrade_used = #{subUpgradeUsed},
+            main_property = #{mainProperty},
+            main_value = #{mainValue},
+            equipped_by = #{equippedBy,jdbcType=BIGINT},
+            locked = #{locked},
+            origin = #{origin},
+            sort_order = #{sortOrder},
+            update_by = #{updateBy},
+            update_time = #{updateTime}
+        where id = #{id}
+    </update>
+
+    <update id="updateSrUserRelicLock">
+        update sr_user_relic
+        set locked = #{locked}, update_by = #{updateBy}, update_time = #{updateTime}
+        where id = #{id}
+    </update>
+
+    <update id="updateSrUserRelicEquip">
+        update sr_user_relic
+        set equipped_by = #{equippedBy,jdbcType=BIGINT}, update_by = #{updateBy}, update_time = #{updateTime}
+        where id = #{id}
+    </update>
+
+    <delete id="deleteSrUserRelicByIds" parameterType="Long">
+        delete from sr_user_relic where id in
+        <foreach collection="array" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+</mapper>

@@ -55,6 +55,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where id = #{id}
     </select>
 
+    <select id="selectSrUserCharacterOptions" resultType="com.quico.srhelper.domain.vo.SrUserCharacterOptionVO">
+        select uc.id            as id,
+               uc.character_id  as characterId,
+               c.character_name as characterName
+        from sr_user_character uc
+        left join sr_character c on c.id = uc.character_id
+        where uc.user_id = #{userId}
+        order by uc.id desc
+    </select>
+
     <insert id="insertSrUserCharacter" parameterType="SrUserCharacter" useGeneratedKeys="true" keyProperty="id">
         insert into sr_user_character
         <trim prefix="(" suffix=")" suffixOverrides=",">

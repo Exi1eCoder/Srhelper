@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quico.srhelper.mapper.SrRelicMapper">
+    
+    <resultMap type="SrRelic" id="SrRelicResult">
+        <result property="id"    column="id"    />
+        <result property="relicId"    column="relic_id"    />
+        <result property="setId"    column="set_id"    />
+        <result property="relicName"    column="relic_name"    />
+        <result property="rarity"    column="rarity"    />
+        <result property="slot"    column="slot"    />
+        <result property="maxLevel"    column="max_level"    />
+        <result property="mainAffixId"    column="main_affix_id"    />
+        <result property="subAffixId"    column="sub_affix_id"    />
+        <result property="icon"    column="icon"    />
+        <result property="sortOrder"    column="sort_order"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"    column="remark"    />
+    </resultMap>
+
+    <sql id="selectSrRelicVo">
+        select id, relic_id, set_id, relic_name, rarity, slot, max_level, main_affix_id, sub_affix_id, icon, sort_order, create_by, create_time, update_by, update_time, remark from sr_relic
+    </sql>
+
+    <select id="selectSrRelicList" parameterType="SrRelic" resultMap="SrRelicResult">
+        <include refid="selectSrRelicVo"/>
+        <where>  
+            <if test="relicName != null  and relicName != ''"> and relic_name like concat('%', #{relicName}, '%')</if>
+            <if test="rarity != null "> and rarity = #{rarity}</if>
+            <if test="slot != null  and slot != ''"> and slot = #{slot}</if>
+        </where>
+        order by relic_id desc
+    </select>
+    
+    <select id="selectSrRelicById" parameterType="Long" resultMap="SrRelicResult">
+        <include refid="selectSrRelicVo"/>
+        where id = #{id}
+    </select>
+
+    <select id="selectSrRelicByRelicId" parameterType="String" resultMap="SrRelicResult">
+        <include refid="selectSrRelicVo"/>
+        where relic_id = #{relicId}
+    </select>
+
+    <select id="selectRelicPiecesBySetId" parameterType="String" resultType="com.quico.srhelper.domain.vo.SrRelicPieceVO">
+        select r.set_id, rs.set_name, r.relic_id, r.relic_name, r.slot, r.icon
+        from sr_relic r
+        inner join sr_relic_set rs on r.set_id = rs.set_id
+        where r.rarity = 5 and r.set_id = #{setId}
+        order by r.sort_order desc
+    </select>
+
+    <insert id="insertSrRelic" parameterType="SrRelic" useGeneratedKeys="true" keyProperty="id">
+        insert into sr_relic
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="relicId != null and relicId != ''">relic_id,</if>
+            <if test="setId != null and setId != ''">set_id,</if>
+            <if test="relicName != null">relic_name,</if>
+            <if test="rarity != null">rarity,</if>
+            <if test="slot != null and slot != ''">slot,</if>
+            <if test="maxLevel != null">max_level,</if>
+            <if test="mainAffixId != null and mainAffixId != ''">main_affix_id,</if>
+            <if test="subAffixId != null and subAffixId != ''">sub_affix_id,</if>
+            <if test="icon != null">icon,</if>
+            <if test="sortOrder != null">sort_order,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="remark != null">remark,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="relicId != null and relicId != ''">#{relicId},</if>
+            <if test="setId != null and setId != ''">#{setId},</if>
+            <if test="relicName != null">#{relicName},</if>
+            <if test="rarity != null">#{rarity},</if>
+            <if test="slot != null and slot != ''">#{slot},</if>
+            <if test="maxLevel != null">#{maxLevel},</if>
+            <if test="mainAffixId != null and mainAffixId != ''">#{mainAffixId},</if>
+            <if test="subAffixId != null and subAffixId != ''">#{subAffixId},</if>
+            <if test="icon != null">#{icon},</if>
+            <if test="sortOrder != null">#{sortOrder},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="remark != null">#{remark},</if>
+         </trim>
+    </insert>
+
+    <update id="updateSrRelic" parameterType="SrRelic">
+        update sr_relic
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="relicId != null and relicId != ''">relic_id = #{relicId},</if>
+            <if test="setId != null and setId != ''">set_id = #{setId},</if>
+            <if test="relicName != null">relic_name = #{relicName},</if>
+            <if test="rarity != null">rarity = #{rarity},</if>
+            <if test="slot != null and slot != ''">slot = #{slot},</if>
+            <if test="maxLevel != null">max_level = #{maxLevel},</if>
+            <if test="mainAffixId != null and mainAffixId != ''">main_affix_id = #{mainAffixId},</if>
+            <if test="subAffixId != null and subAffixId != ''">sub_affix_id = #{subAffixId},</if>
+            <if test="icon != null">icon = #{icon},</if>
+            <if test="sortOrder != null">sort_order = #{sortOrder},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteSrRelicById" parameterType="Long">
+        delete from sr_relic where id = #{id}
+    </delete>
+
+    <delete id="deleteSrRelicByIds" parameterType="String">
+        delete from sr_relic where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

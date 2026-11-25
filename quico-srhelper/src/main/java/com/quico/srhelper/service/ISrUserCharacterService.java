@@ -2,6 +2,7 @@ package com.quico.srhelper.service;
 
 import java.util.List;
 import com.quico.srhelper.domain.SrUserCharacter;
+import com.quico.srhelper.domain.vo.SrUserCharacterOptionVO;
 
 /**
  * 我的角色Service接口
@@ -26,6 +27,13 @@ public interface ISrUserCharacterService
      * @return 我的角色集合
      */
     public List<SrUserCharacter> selectSrUserCharacterList(SrUserCharacter srUserCharacter);
+
+    /**
+     * 查询我的角色下拉选项（仅材料绑定完整的角色）
+     * 
+     * @return 下拉选项集合
+     */
+    public List<SrUserCharacterOptionVO> selectSrUserCharacterOptions();
 
     /**
      * 新增我的角色

@@ -71,6 +71,17 @@ public class SrUserCharacterController extends BaseController
     }
 
     /**
+     * 查询我的角色下拉选项
+     */
+    @Operation(summary = "查询我的角色下拉选项", description = "返回持有记录ID、角色ID与角色名称，仅包含材料绑定完整的角色")
+    @PreAuthorize("@ss.hasPermi('srhelper:userCharacter:list')")
+    @GetMapping("/options")
+    public AjaxResult options()
+    {
+        return success(srUserCharacterService.selectSrUserCharacterOptions());
+    }
+
+    /**
      * 获取我的角色详细信息
      */
     @Operation(summary = "获取我的角色详细信息", description = "根据ID获取我的角色详细信息")

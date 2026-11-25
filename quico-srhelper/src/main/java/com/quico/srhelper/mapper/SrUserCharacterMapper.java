@@ -1,7 +1,11 @@
 package com.quico.srhelper.mapper;
 
 import java.util.List;
+
+import org.apache.ibatis.annotations.Param;
+
 import com.quico.srhelper.domain.SrUserCharacter;
+import com.quico.srhelper.domain.vo.SrUserCharacterOptionVO;
 
 /**
  * 我的角色Mapper接口
@@ -26,6 +30,14 @@ public interface SrUserCharacterMapper
      * @return 我的角色集合
      */
     public List<SrUserCharacter> selectSrUserCharacterList(SrUserCharacter srUserCharacter);
+
+    /**
+     * 查询我的角色下拉选项
+     * 
+     * @param userId 用户ID
+     * @return 下拉选项集合
+     */
+    public List<SrUserCharacterOptionVO> selectSrUserCharacterOptions(@Param("userId") Long userId);
 
     /**
      * 新增我的角色

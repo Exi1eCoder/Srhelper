@@ -2,8 +2,10 @@ package com.quico.srhelper.service.impl;
 
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import com.quico.common.exception.BusinessException;
 import com.quico.common.utils.DateUtils;
+import com.quico.common.utils.SecurityUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.quico.srhelper.mapper.SrCharacterMapper;
@@ -11,6 +13,7 @@ import com.quico.srhelper.mapper.SrUserCharacterMapper;
 import com.quico.srhelper.domain.SrCharacter;
 import com.quico.srhelper.domain.SrUserCharacter;
 import com.quico.srhelper.domain.enums.CharacterPathEnum;
+import com.quico.srhelper.domain.vo.SrUserCharacterOptionVO;
 import com.quico.srhelper.service.ISrUserCharacterService;
 import com.quico.srhelper.service.helper.UsableChecker;
 
@@ -56,6 +59,26 @@ public class SrUserCharacterServiceImpl implements ISrUserCharacterService
         List<SrUserCharacter> list = srUserCharacterMapper.selectSrUserCharacterList(srUserCharacter);
         markUsable(list);
         return list;
+    }
+
+    /**
+     * 查询我的角色下拉选项（仅材料绑定完整的角色）
+     * 
+     * @return 下拉选项集合
+     */
+    @Override
+    public List<SrUserCharacterOptionVO> selectSrUserCharacterOptions()
+    {
+        List<SrUserCharacterOptionVO> options = srUserCharacterMapper
+                .selectSrUserCharacterOptions(SecurityUtils.getUserId());
+        if (options == null || options.isEmpty())
+        {
+            return options;
+        }
+        Set<Long> usableIds = usableChecker.getUsableCharacterIds();
+        return options.stream()
+                .filter(option -> usableIds.contains(option.getCharacterId()))
+                .collect(Collectors.toList());
     }
 
     /**

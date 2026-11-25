@@ -20,6 +20,9 @@ public class SrhelperCacheConstants {
     /** 物品列表缓存 */
     public static final String ITEM_LIST_KEY = PREFIX + "item_list:";
 
+    /** 遗器套装列表缓存 */
+    public static final String RELIC_SET_LIST_KEY = PREFIX + "relic_set_list:";
+
     /** 游戏版本列表缓存 */
     public static final String RELEASE_VERSION_LIST_KEY = PREFIX + "release_version_list:";
 

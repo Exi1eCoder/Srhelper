@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quico.srhelper.mapper.SrUserRelicSubAffixMapper">
+
+    <resultMap type="SrUserRelicSubAffix" id="SrUserRelicSubAffixResult">
+        <result property="id"            column="id"              />
+        <result property="userRelicId"   column="user_relic_id"   />
+        <result property="property"      column="property"        />
+        <result property="baseTier"      column="base_tier"       />
+        <result property="baseValue"     column="base_value"      />
+        <result property="upgradeTiers"  column="upgrade_tiers"   />
+        <result property="upgradeValue"  column="upgrade_value"   />
+        <result property="totalValue"    column="total_value"     />
+        <result property="sortOrder"     column="sort_order"      />
+        <result property="createBy"      column="create_by"       />
+        <result property="createTime"    column="create_time"     />
+        <result property="updateBy"      column="update_by"       />
+        <result property="updateTime"    column="update_time"     />
+        <result property="remark"        column="remark"          />
+    </resultMap>
+
+    <select id="selectByUserRelicId" parameterType="Long" resultMap="SrUserRelicSubAffixResult">
+        select id, user_relic_id, property, base_tier, base_value, upgrade_tiers,
+               upgrade_value, total_value, sort_order, create_by, create_time,
+               update_by, update_time, remark
+        from sr_user_relic_sub_affix
+        where user_relic_id = #{userRelicId}
+        order by sort_order asc, id asc
+    </select>
+
+    <insert id="batchInsert" parameterType="java.util.List">
+        insert into sr_user_relic_sub_affix
+            (user_relic_id, property, base_tier, base_value, upgrade_tiers,
+             upgrade_value, total_value, sort_order, create_by, create_time)
+        values
+        <foreach collection="list" item="item" separator=",">
+            (#{item.userRelicId}, #{item.property}, #{item.baseTier}, #{item.baseValue}, #{item.upgradeTiers},
+             #{item.upgradeValue}, #{item.totalValue}, #{item.sortOrder}, #{item.createBy}, #{item.createTime})
+        </foreach>
+    </insert>
+
+    <delete id="deleteByUserRelicId" parameterType="Long">
+        delete from sr_user_relic_sub_affix where user_relic_id = #{userRelicId}
+    </delete>
+
+    <delete id="deleteByUserRelicIds">
+        delete from sr_user_relic_sub_affix where user_relic_id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+</mapper>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quico.srhelper.mapper.SrRelicMainAffixMapper">
+
+    <resultMap type="SrRelicMainAffix" id="SrRelicMainAffixResult">
+        <result property="id"           column="id"             />
+        <result property="affixGroupId" column="affix_group_id" />
+        <result property="affixId"      column="affix_id"       />
+        <result property="property"     column="property"       />
+        <result property="base"         column="base"           />
+        <result property="step"         column="step"           />
+        <result property="sortOrder"    column="sort_order"     />
+    </resultMap>
+
+    <select id="selectByGroupIds" resultMap="SrRelicMainAffixResult">
+        select id, affix_group_id, affix_id, property, base, step, sort_order
+        from sr_relic_main_affix
+        where affix_group_id in
+        <foreach collection="groupIds" item="groupId" open="(" separator="," close=")">
+            #{groupId}
+        </foreach>
+        order by affix_group_id asc, sort_order asc
+    </select>
+
+</mapper>
